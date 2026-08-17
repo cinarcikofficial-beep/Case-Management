@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     high: "Yüksek",
     urgent: "Acil",
   };
-  const priorityColor: Record<string, string> = {
+  const priorityColor: Record<string, { bg: string; text: string; border: string }> = {
     urgent: { bg: "#fef2f2", text: "#dc2626", border: "#fecaca" },
     high: { bg: "#fff7ed", text: "#ea580c", border: "#fed7aa" },
     medium: { bg: "#fefce8", text: "#ca8a04", border: "#fef08a" },
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
       const num = String(c.case_number).padStart(4, "0");
       const bgColor = i % 2 === 0 ? "#ffffff" : "#f8fafc";
       const sc = statusColor[c.status] || { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" };
-      const pc = (priorityColor[c.priority] || { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" }) as { bg: string; text: string; border: string };
+      const pc = priorityColor[c.priority] || { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" };
 
       return `
         <tr style="background:${bgColor};">
