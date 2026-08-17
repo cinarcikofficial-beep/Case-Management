@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Search, Eye, Tag } from "lucide-react";
+import { Plus, Search, Eye, Tag, Pencil, Trash2 } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { toast } from "sonner";
 import type { Tables } from "@/types/database";
 
 type Article = Tables<"knowledge_base"> & {
@@ -36,7 +37,9 @@ export default function KnowledgeBasePage() {
       );
 
     if (category) query = query.eq("category", category);
-    if (search) query = query.ilike("title", `%${search}%`);
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+    }
 
     query = query.order("created_at", { ascending: false });
 
@@ -48,6 +51,17 @@ export default function KnowledgeBasePage() {
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     await fetchArticles();
+  }
+
+  async function handleDelete(id: string, title: string) {
+    if (!confirm(`"${title}" makalesini silmek istediğinizden emin misiniz?`)) return;
+    const { error } = await supabase.from("knowledge_base").delete().eq("id", id);
+    if (error) {
+      toast.error("Silinemedi: " + error.message);
+    } else {
+      toast.success("Makale silindi.");
+      setArticles((prev) => prev.filter((a) => a.id !== id));
+    }
   }
 
   const categories = [
@@ -119,9 +133,26 @@ export default function KnowledgeBasePage() {
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-medium">
                   {article.category}
                 </span>
-                <div className="flex items-center gap-1 text-zinc-500">
-                  <Eye className="h-3 w-3" />
-                  <span className="text-[10px]">{article.view_count}</span>
+                <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 text-zinc-500">
+                    <Eye className="h-3 w-3" />
+                    <span className="text-[10px]">{article.view_count}</span>
+                  </div>
+                  <Link
+                    href={`/knowledge-base/${article.id}/edit`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1 rounded-lg hover:bg-[#162238]/80 transition-all text-zinc-500 hover:text-indigo-400"
+                    title="Düzenle"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Link>
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(article.id, article.title); }}
+                    className="p-1 rounded-lg hover:bg-red-500/10 transition-all text-zinc-500 hover:text-red-400"
+                    title="Sil"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
                 </div>
               </div>
               <h3 className="text-sm font-bold text-zinc-100 group-hover:text-indigo-400 transition-colors line-clamp-2 mb-2">

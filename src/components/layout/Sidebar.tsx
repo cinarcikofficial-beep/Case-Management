@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   BookOpen,
-  Settings,
   Shield,
   Plus,
   LogOut,
@@ -18,7 +17,6 @@ import Image from "next/image";
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Bilgi Bankası", href: "/knowledge-base", icon: BookOpen },
-  { name: "Ayarlar", href: "/settings", icon: Settings },
 ];
 
 const adminNavigation = [
@@ -44,7 +42,7 @@ export function Sidebar({ userRole }: SidebarProps) {
     <aside className="fixed left-0 top-0 h-full w-72 bg-[#0b111e] border-r border-[#233554]/60 flex flex-col z-50">
       {/* Logo */}
       <div className="p-6 border-b border-[#233554]/60 text-center">
-        <Link href="/dashboard" className="flex flex-col items-center">
+        <button onClick={() => router.refresh()} className="flex flex-col items-center w-full cursor-pointer">
           <Image src="/verytech_beyaz.png" alt="Verytech" width={140} height={140} className="object-contain mb-3" />
           <h1 className="text-2xl font-bold text-white tracking-wide">
             Verytech
@@ -52,7 +50,7 @@ export function Sidebar({ userRole }: SidebarProps) {
           <p className="text-sm font-semibold text-slate-300">
             Case Management & Knowledge Base
           </p>
-        </Link>
+        </button>
       </div>
 
       {/* Quick Action */}

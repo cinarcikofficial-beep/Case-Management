@@ -51,7 +51,7 @@ export interface Database {
           title: string;
           description: string | null;
           source: "customer" | "internal";
-          status: "open" | "in_progress" | "waiting" | "resolved" | "closed";
+          status: "open" | "in_progress" | "closed";
           priority: "low" | "medium" | "high" | "urgent";
           brand_id: string | null;
           application_id: string | null;
@@ -70,7 +70,7 @@ export interface Database {
           title: string;
           description?: string | null;
           source: "customer" | "internal";
-          status?: "open" | "in_progress" | "waiting" | "resolved" | "closed";
+          status?: "open" | "in_progress" | "closed";
           priority?: "low" | "medium" | "high" | "urgent";
           brand_id?: string | null;
           application_id?: string | null;
@@ -89,7 +89,7 @@ export interface Database {
           title?: string;
           description?: string | null;
           source?: "customer" | "internal";
-          status?: "open" | "in_progress" | "waiting" | "resolved" | "closed";
+          status?: "open" | "in_progress" | "closed";
           priority?: "low" | "medium" | "high" | "urgent";
           brand_id?: string | null;
           application_id?: string | null;

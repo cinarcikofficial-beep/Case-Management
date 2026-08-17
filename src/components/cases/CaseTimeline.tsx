@@ -3,14 +3,17 @@
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { Pencil, Trash2, Check, X, Send } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface TimelineItem {
   id: string;
   type: "status_change" | "note" | "assignment" | "created";
   content: string;
   author: string;
+  authorId?: string;
   authorEmail?: string;
   createdAt: string;
   metadata?: Record<string, string | null>;
@@ -19,11 +22,15 @@ interface TimelineItem {
 interface CaseTimelineProps {
   caseId: string;
   refreshKey?: number;
+  currentUserId?: string;
+  onRefresh?: () => void;
 }
 
-export function CaseTimeline({ caseId, refreshKey }: CaseTimelineProps) {
+export function CaseTimeline({ caseId, refreshKey, currentUserId, onRefresh }: CaseTimelineProps) {
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -72,6 +79,7 @@ export function CaseTimeline({ caseId, refreshKey }: CaseTimelineProps) {
             type: "note",
             content: note.content,
             author: profile?.full_name || "Bilinmiyor",
+            authorId: note.author_id,
             authorEmail: profile?.email,
             createdAt: note.created_at,
             metadata: { is_internal: String(note.is_internal) },
@@ -104,19 +112,58 @@ export function CaseTimeline({ caseId, refreshKey }: CaseTimelineProps) {
     fetchTimeline();
   }, [caseId, refreshKey, supabase]);
 
+  async function handleDeleteNote(id: string) {
+    if (!confirm("Bu notu silmek istediğinizden emin misiniz?")) return;
+    const { error } = await supabase.from("case_notes").delete().eq("id", id);
+    if (error) {
+      toast.error("Silinemedi: " + error.message);
+    } else {
+      toast.success("Not silindi.");
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      onRefresh?.();
+    }
+  }
+
+  async function handleEditNote(id: string) {
+    if (!editContent.trim()) return;
+    const { error } = await supabase
+      .from("case_notes")
+      .update({ content: editContent })
+      .eq("id", id);
+    if (error) {
+      toast.error("Güncellenemedi: " + error.message);
+    } else {
+      toast.success("Not güncellendi.");
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, content: editContent } : item
+        )
+      );
+      setEditingId(null);
+      onRefresh?.();
+    }
+  }
+
+  const visibleItems = items.filter((item) => {
+    if (item.type === "note" && item.metadata?.is_internal === "true") {
+      return item.authorId === currentUserId;
+    }
+    return true;
+  });
+
   if (loading) {
     return <div className="text-zinc-500 text-sm py-4">Yükleniyor...</div>;
   }
 
   return (
     <div className="space-y-4">
-      {items.length === 0 ? (
+      {visibleItems.length === 0 ? (
         <p className="text-zinc-500 text-sm text-center py-4">
           Henüz aktivite bulunmuyor.
         </p>
       ) : (
-        items.map((item, index) => (
-          <div key={item.id} className="flex gap-3">
+        visibleItems.map((item, index) => (
+          <div key={item.id} className="flex gap-3 group/item">
             {/* Timeline line */}
             <div className="flex flex-col items-center">
               <div
@@ -138,7 +185,7 @@ export function CaseTimeline({ caseId, refreshKey }: CaseTimelineProps) {
                   ? "✨"
                   : "👤"}
               </div>
-              {index < items.length - 1 && (
+              {index < visibleItems.length - 1 && (
                 <div className="w-px h-full bg-[#233554]/60 min-h-[20px]" />
               )}
             </div>
@@ -161,10 +208,56 @@ export function CaseTimeline({ caseId, refreshKey }: CaseTimelineProps) {
                     Internal
                   </span>
                 )}
+                {/* Edit/Delete buttons for notes */}
+                {item.type === "note" && item.authorId === currentUserId && editingId !== item.id && (
+                  <div className="opacity-0 group-hover/item:opacity-100 flex items-center gap-1 ml-auto transition-all">
+                    <button
+                      onClick={() => { setEditingId(item.id); setEditContent(item.content); }}
+                      className="p-1 rounded-lg hover:bg-[#162238]/80 text-zinc-500 hover:text-indigo-400 transition-all"
+                      title="Düzenle"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteNote(item.id)}
+                      className="p-1 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-all"
+                      title="Sil"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
               </div>
-              <p className="text-sm text-zinc-400 mt-1 whitespace-pre-wrap">
-                {item.content}
-              </p>
+              {/* Edit mode */}
+              {editingId === item.id ? (
+                <div className="mt-2 space-y-2">
+                  <textarea
+                    rows={3}
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    autoFocus
+                    className="w-full px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80 resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditNote(item.id)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium transition-all"
+                    >
+                      <Check className="h-3 w-3" /> Kaydet
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white text-xs font-medium transition-all"
+                    >
+                      <X className="h-3 w-3" /> İptal
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-400 mt-1 whitespace-pre-wrap">
+                  {item.content}
+                </p>
+              )}
             </div>
           </div>
         ))

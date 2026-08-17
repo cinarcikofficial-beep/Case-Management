@@ -17,11 +17,16 @@ import {
   ChevronRight,
   RefreshCw,
   X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { CASE_STATUSES, CASE_SOURCES } from "@/lib/constants";
+import { formatDistanceToNow } from "date-fns";
+import { tr } from "date-fns/locale";
 import type { Tables } from "@/types/database";
 import { toast } from "sonner";
 
@@ -47,7 +52,10 @@ export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
+  const [assignedFilter, setAssignedFilter] = useState<"all" | "me" | "none">("all");
   const [activeStatFilter, setActiveStatFilter] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<string>("created_at");
+  const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(0);
   const limit = 10;
   const supabase = createClient();
@@ -62,11 +70,11 @@ export default function DashboardPage() {
         supabase
           .from("cases")
           .select("*", { count: "exact", head: true })
-          .in("status", ["open", "in_progress", "waiting"]),
+          .in("status", ["open", "in_progress"]),
         supabase
           .from("cases")
           .select("*", { count: "exact", head: true })
-          .in("status", ["resolved", "closed"]),
+          .eq("status", "closed"),
         supabase
           .from("cases")
           .select("*", { count: "exact", head: true })
@@ -79,7 +87,7 @@ export default function DashboardPage() {
               .from("cases")
               .select("*", { count: "exact", head: true })
               .eq("assigned_to", user.id)
-              .in("status", ["open", "in_progress", "waiting"])
+              .in("status", ["open", "in_progress"])
           : { count: 0 },
       ]);
 
@@ -112,8 +120,32 @@ export default function DashboardPage() {
 
     if (statusFilter) query = query.eq("status", statusFilter);
     if (sourceFilter) query = query.eq("source", sourceFilter);
+    if (assignedFilter === "me" && !activeStatFilter) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) query = query.eq("assigned_to", user.id);
+    } else if (assignedFilter === "none" && !activeStatFilter) {
+      query = query.is("assigned_to", null);
+    }
+    let brandIds: string[] | null = null;
+    let applicationIds: string[] | null = null;
     if (search) {
-      query = query.or(`title.ilike.%${search}%`);
+      const [brandRes, appRes] = await Promise.all([
+        supabase.from("brands").select("id").ilike("name", `%${search}%`),
+        supabase.from("applications").select("id").ilike("name", `%${search}%`),
+      ]);
+      brandIds = (brandRes.data || []).map((b) => b.id);
+      applicationIds = (appRes.data || []).map((a) => a.id);
+    }
+
+    if (search) {
+      const parts = [
+        "title.ilike.%" + search + "%",
+        "customer_name.ilike.%" + search + "%",
+        "description.ilike.%" + search + "%",
+      ];
+      if (brandIds && brandIds.length > 0) parts.push("brand_id.in.(" + brandIds.join(",") + ")");
+      if (applicationIds && applicationIds.length > 0) parts.push("application_id.in.(" + applicationIds.join(",") + ")");
+      query = query.or(parts.join(","));
     }
 
     if (activeStatFilter === "today") {
@@ -125,9 +157,23 @@ export default function DashboardPage() {
       query = query.eq("assigned_to", user.id);
     }
 
-    query = query
-      .order("created_at", { ascending: false })
-      .range(page * limit, page * limit + limit - 1);
+    const dbSortFields: Record<string, string> = {
+      case_number: "case_number",
+      title: "title",
+      source: "source",
+      status: "status",
+      priority: "priority",
+      created_at: "created_at",
+    };
+
+    const dbField = dbSortFields[sortField];
+    if (dbField) {
+      query = query.order(dbField, { ascending: sortAsc });
+    } else {
+      query = query.order("created_at", { ascending: false });
+    }
+
+    query = query.range(page * limit, page * limit + limit - 1);
 
     const { data, count, error } = await query;
 
@@ -154,12 +200,27 @@ export default function DashboardPage() {
         profiles_cases_created_by: profileMap.get(c.created_by),
         profiles_cases_assigned_to: profileMap.get(c.assigned_to),
       }));
+
+      if (sortField === "brand") {
+        enrichedCases.sort((a, b) => {
+          const aName = a.brands?.name || "";
+          const bName = b.brands?.name || "";
+          return sortAsc ? aName.localeCompare(bName) : bName.localeCompare(aName);
+        });
+      } else if (sortField === "assigned_to") {
+        enrichedCases.sort((a, b) => {
+          const aName = a.profiles_cases_assigned_to?.full_name || "";
+          const bName = b.profiles_cases_assigned_to?.full_name || "";
+          return sortAsc ? aName.localeCompare(bName) : bName.localeCompare(aName);
+        });
+      }
+
       setCases(enrichedCases);
       setTotal(count || 0);
     }
 
     setLoading(false);
-  }, [supabase, statusFilter, sourceFilter, search, page, activeStatFilter]);
+  }, [supabase, statusFilter, sourceFilter, assignedFilter, search, page, activeStatFilter, sortField, sortAsc]);
 
   useEffect(() => {
     fetchCases();
@@ -196,13 +257,13 @@ export default function DashboardPage() {
       active: statusFilter === "open",
     },
     {
-      title: "Çözülen Vakalar",
+      title: "Kapanan Vakalar",
       value: stats.resolvedCases,
       icon: CheckCircle2,
       color: "text-green-400",
       bg: "bg-green-500/10",
-      type: "resolved",
-      active: statusFilter === "resolved",
+      type: "closed",
+      active: statusFilter === "closed",
     },
     {
       title: "Bugünkü Yeni Vakalar",
@@ -228,11 +289,27 @@ export default function DashboardPage() {
     setSearch("");
     setStatusFilter("");
     setSourceFilter("");
+    setAssignedFilter("all");
     setActiveStatFilter(null);
     setPage(0);
   };
 
-  const hasActiveFilter = search || statusFilter || sourceFilter || activeStatFilter;
+  const hasActiveFilter = search || statusFilter || sourceFilter || assignedFilter !== "all" || activeStatFilter;
+
+  function handleSort(field: string) {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+    setPage(0);
+  }
+
+  function SortIcon({ field }: { field: string }) {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-zinc-600" />;
+    return sortAsc ? <ArrowUp className="h-3 w-3 text-indigo-400" /> : <ArrowDown className="h-3 w-3 text-indigo-400" />;
+  }
 
   if (loadingStats) {
     return (
@@ -305,7 +382,7 @@ export default function DashboardPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
             <input
               type="text"
-              placeholder="Vaka ara... (başlık)"
+              placeholder="Vaka ara... (başlık, müşteri, açıklama, marka, uygulama)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80 transition-all placeholder-zinc-500"
@@ -345,6 +422,20 @@ export default function DashboardPage() {
             ))}
           </select>
 
+          <select
+            value={assignedFilter}
+            onChange={(e) => {
+              setAssignedFilter(e.target.value as "all" | "me" | "none");
+              setActiveStatFilter(null);
+              setPage(0);
+            }}
+            className="px-3 py-2.5 rounded-xl bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80 transition-all"
+          >
+            <option value="all">Tüm Atamalar</option>
+            <option value="me">Bana Atanan</option>
+            <option value="none">Atanmamış</option>
+          </select>
+
           <button
             type="submit"
             className="px-4 py-2.5 rounded-xl bg-[#1e2e4a] text-white text-sm font-medium border border-[#2d446b]/50 hover:bg-[#233554] transition-all"
@@ -371,29 +462,32 @@ export default function DashboardPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#233554]/60">
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Vaka No
+                <th onClick={() => handleSort("case_number")} className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-zinc-200 transition-colors select-none">
+                  <div className="flex items-center gap-1.5">Vaka No <SortIcon field="case_number" /></div>
+                </th>
+                <th onClick={() => handleSort("title")} className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-zinc-200 transition-colors select-none">
+                  <div className="flex items-center gap-1.5">Başlık <SortIcon field="title" /></div>
+                </th>
+                <th onClick={() => handleSort("source")} className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-zinc-200 transition-colors select-none">
+                  <div className="flex items-center gap-1.5">Kaynak <SortIcon field="source" /></div>
+                </th>
+                <th onClick={() => handleSort("status")} className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-zinc-200 transition-colors select-none">
+                  <div className="flex items-center gap-1.5">Durum <SortIcon field="status" /></div>
+                </th>
+                <th onClick={() => handleSort("priority")} className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-zinc-200 transition-colors select-none">
+                  <div className="flex items-center gap-1.5">Öncelik <SortIcon field="priority" /></div>
+                </th>
+                <th onClick={() => handleSort("brand")} className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-zinc-200 transition-colors select-none">
+                  <div className="flex items-center gap-1.5">Marka <SortIcon field="brand" /></div>
+                </th>
+                <th onClick={() => handleSort("assigned_to")} className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-zinc-200 transition-colors select-none">
+                  <div className="flex items-center gap-1.5">Atanan <SortIcon field="assigned_to" /></div>
+                </th>
+                <th onClick={() => handleSort("created_at")} className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-zinc-200 transition-colors select-none">
+                  <div className="flex items-center gap-1.5">Tarih <SortIcon field="created_at" /></div>
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Başlık
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Kaynak
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Durum
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Öncelik
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Marka
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Atanan
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  Tarih
+                  Geçen Süre
                 </th>
               </tr>
             </thead>
@@ -401,7 +495,7 @@ export default function DashboardPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center py-12 text-zinc-500"
                   >
                     Yükleniyor...
@@ -410,7 +504,7 @@ export default function DashboardPage() {
               ) : cases.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center py-12 text-zinc-500"
                   >
                     Vaka bulunamadı.
@@ -484,6 +578,13 @@ export default function DashboardPage() {
                     <td className="px-4 py-3">
                       <span className="text-sm text-zinc-500">
                         {new Date(c.created_at).toLocaleDateString("tr-TR")}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-indigo-400 font-medium">
+                        {c.status === "closed"
+                          ? formatDistanceToNow(new Date(c.created_at), { addSuffix: false, locale: tr })
+                          : formatDistanceToNow(new Date(c.created_at), { addSuffix: false, locale: tr })}
                       </span>
                     </td>
                   </tr>

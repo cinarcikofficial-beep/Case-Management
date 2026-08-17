@@ -51,13 +51,13 @@ export default function CaseDetailPage({
   const [applications, setApplications] = useState<Application[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
   const [noteContent, setNoteContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Edit mode state
-  const [editMode, setEditMode] = useState(false);
+  const [editingField, setEditingField] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPriority, setEditPriority] = useState<CaseData["priority"]>("medium");
@@ -68,6 +68,9 @@ export default function CaseDetailPage({
 
   useEffect(() => {
     async function fetchCase() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+
       const { data } = await supabase
         .from("cases")
         .select("*, brands(name), applications(name)")
@@ -120,20 +123,6 @@ export default function CaseDetailPage({
       if (customersData) setCustomers(customersData as Customer[]);
     }
 
-    async function fetchApplications(brandId: string) {
-      if (brandId) {
-        const { data } = await supabase
-          .from("applications")
-          .select("*")
-          .eq("brand_id", brandId)
-          .eq("is_active", true)
-          .order("name");
-        if (data) setApplications(data);
-      } else {
-        setApplications([]);
-      }
-    }
-
     fetchCase();
     fetchDropdownData();
   }, [id, supabase, router]);
@@ -157,19 +146,15 @@ export default function CaseDetailPage({
 
   async function handleStatusChange(newStatus: string) {
     if (!caseData) return;
-
     const { error } = await supabase
       .from("cases")
       .update({ status: newStatus })
       .eq("id", caseData.id);
-
     if (error) {
       toast.error("Durum güncellenirken hata oluştu.");
     } else {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
         await supabase.from("case_status_log").insert({
           case_id: caseData.id,
           from_status: caseData.status,
@@ -177,7 +162,6 @@ export default function CaseDetailPage({
           changed_by: user?.id || "",
         });
       } catch {}
-
       toast.success("Durum güncellendi.");
       setCaseData({ ...caseData, status: newStatus as CaseData["status"] });
       setRefreshKey((k) => k + 1);
@@ -186,19 +170,19 @@ export default function CaseDetailPage({
 
   async function handleAssign(userId: string) {
     if (!caseData) return;
-
+    const updates: Record<string, unknown> = { assigned_to: userId || null };
+    if (userId && caseData.status === "open") {
+      updates.status = "in_progress";
+    }
     const { error } = await supabase
       .from("cases")
-      .update({ assigned_to: userId || null })
+      .update(updates)
       .eq("id", caseData.id);
-
     if (error) {
       toast.error("Atama güncellenirken hata oluştu.");
     } else {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
         await supabase.from("case_history").insert({
           case_id: caseData.id,
           changed_by: user?.id || "",
@@ -207,37 +191,28 @@ export default function CaseDetailPage({
           new_value: userId || null,
         });
       } catch {}
-
       toast.success("Atama güncellendi.");
       setRefreshKey((k) => k + 1);
-      if (caseData) {
-        setCaseData({ ...caseData, assigned_to: userId || null });
-      }
+      setCaseData({ ...caseData, ...updates } as CaseData);
     }
   }
 
   async function handleAddNote(e: React.FormEvent) {
     e.preventDefault();
     if (!noteContent.trim() || !caseData) return;
-
     setSubmitting(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Oturum açmanız gerekiyor.");
       setSubmitting(false);
       return;
     }
-
     const { error } = await supabase.from("case_notes").insert({
       case_id: caseData.id,
       author_id: user.id,
       content: noteContent,
       is_internal: isInternal,
     });
-
     if (error) {
       toast.error("Not eklenirken hata oluştu.");
     } else {
@@ -249,37 +224,44 @@ export default function CaseDetailPage({
     setSubmitting(false);
   }
 
-  async function handleSaveChanges() {
+  function startEditField(field: string) {
     if (!caseData) return;
+    setEditTitle(caseData.title);
+    setEditDescription(caseData.description || "");
+    setEditPriority(caseData.priority);
+    setEditBrandId(caseData.brand_id || "");
+    setEditApplicationId(caseData.application_id || "");
+    setEditAssignedTo(caseData.assigned_to || "");
+    setEditCustomerName(caseData.customer_name || "");
+    setEditingField(field);
+  }
+
+  function cancelEditField() {
+    setEditingField(null);
+  }
+
+  async function handleSaveField(field: string) {
+    if (!caseData) return;
+    const updates: Record<string, unknown> = {};
+    if (field === "title") updates.title = editTitle;
+    if (field === "description") updates.description = editDescription;
+    if (field === "priority") updates.priority = editPriority;
+    if (field === "brand") { updates.brand_id = editBrandId || null; updates.application_id = null; }
+    if (field === "application") updates.application_id = editApplicationId || null;
+    if (field === "customer") updates.customer_name = editCustomerName.trim() || null;
+    if (field === "assigned_to") updates.assigned_to = editAssignedTo || null;
 
     const { error } = await supabase
       .from("cases")
-      .update({
-        title: editTitle,
-        description: editDescription,
-        priority: editPriority,
-        brand_id: editBrandId || null,
-        application_id: editApplicationId || null,
-        assigned_to: editAssignedTo || null,
-        customer_name: editCustomerName.trim() || null,
-      })
+      .update(updates)
       .eq("id", caseData.id);
 
     if (error) {
-      toast.error("Değişiklikler kaydedilemedi: " + error.message);
+      toast.error("Kaydedilemedi: " + error.message);
     } else {
-      toast.success("Değişiklikler kaydedildi.");
-      setCaseData({
-        ...caseData,
-        title: editTitle,
-        description: editDescription,
-        priority: editPriority,
-        brand_id: editBrandId || null,
-        application_id: editApplicationId || null,
-        assigned_to: editAssignedTo || null,
-        customer_name: editCustomerName.trim() || null,
-      });
-      setEditMode(false);
+      toast.success("Kaydedildi.");
+      setCaseData({ ...caseData, ...updates } as CaseData);
+      setEditingField(null);
       setRefreshKey((k) => k + 1);
     }
   }
@@ -317,24 +299,6 @@ export default function CaseDetailPage({
     }
   }
 
-  async function handleDeleteCustomer() {
-    if (!editCustomerName) return;
-    const existing = customers.find((c) => c.name === editCustomerName);
-    if (existing && confirm(`"${existing.name}" müşterisini pasif hale getirmek istediğinizden emin misiniz?`)) {
-      const { error } = await supabase
-        .from("customers")
-        .update({ is_active: false })
-        .eq("id", existing.id);
-      if (error) {
-        toast.error("Müşteri güncellenemedi: " + error.message);
-      } else {
-        setCustomers((prev) => prev.filter((c) => c.id !== existing.id));
-        setEditCustomerName("");
-        toast.success("Müşteri pasif hale getirildi.");
-      }
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -350,284 +314,195 @@ export default function CaseDetailPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/cases"
-            className="p-2 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white transition-all"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          {editMode ? (
-            <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
+        <Link
+          href="/cases"
+          className="p-2 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white transition-all"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-mono text-zinc-500">
+              VT-{new Date(caseData.created_at).getFullYear()}-
+              {String(caseData.case_number).padStart(4, "0")}
+            </span>
+            <StatusBadge status={caseData.status} />
+            <PriorityBadge priority={caseData.priority} />
+          </div>
+          {editingField === "title" ? (
+            <div className="flex items-center gap-2 mt-1">
               <input
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") handleSaveField("title"); if (e.key === "Escape") cancelEditField(); }}
                 className="text-xl font-bold bg-[#0b111e]/60 border border-[#233554]/80 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500/80"
               />
-              <button
-                onClick={handleSaveChanges}
-                className="p-1.5 rounded-lg text-green-400 hover:bg-green-400/10 transition-all"
-                title="Kaydet"
-              >
-                <Check className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => {
-                  setEditMode(false);
-                  setEditTitle(caseData.title);
-                  setEditDescription(caseData.description || "");
-                  setEditPriority(caseData.priority);
-                  setEditBrandId(caseData.brand_id || "");
-                  setEditApplicationId(caseData.application_id || "");
-                  setEditAssignedTo(caseData.assigned_to || "");
-                  setEditCustomerName(caseData.customer_name || "");
-                }}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-400/10 transition-all"
-                title="İptal"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <button onClick={() => handleSaveField("title")} className="p-1.5 rounded-lg text-green-400 hover:bg-green-400/10 transition-all"><Check className="h-4 w-4" /></button>
+              <button onClick={cancelEditField} className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-400/10 transition-all"><X className="h-4 w-4" /></button>
             </div>
           ) : (
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-mono text-zinc-500">
-                  VT-{new Date(caseData.created_at).getFullYear()}-
-                  {String(caseData.case_number).padStart(4, "0")}
-                </span>
-                <StatusBadge status={caseData.status} />
-                <PriorityBadge priority={caseData.priority} />
-              </div>
-              <h1 className="text-xl font-bold text-zinc-100 mt-1">
-                {caseData.title}
-              </h1>
-            </div>
+            <h1 className="text-xl font-bold text-zinc-100 mt-1 flex items-center gap-2 group">
+              {caseData.title}
+              <button onClick={() => startEditField("title")} className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-[#162238]/80 transition-all"><Pencil className="h-3.5 w-3.5 text-zinc-500" /></button>
+            </h1>
           )}
         </div>
-        {!editMode && (
-          <button
-            onClick={() => setEditMode(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white text-sm font-medium transition-all"
-          >
-            <Pencil className="h-4 w-4" />
-            Düzenle
-          </button>
-        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Case Info */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Info Card */}
           <div className="glass rounded-2xl p-5 space-y-4">
-            <h3 className="text-sm font-bold text-zinc-100 tracking-wide">
-              Vaka Bilgileri
-            </h3>
-
+            <h3 className="text-sm font-bold text-zinc-100 tracking-wide">Vaka Bilgileri</h3>
             <div className="space-y-3">
+              {/* Kaynak */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-500">Kaynak</span>
                 <div className="flex items-center gap-1.5">
-                  {caseData.source === "customer" ? (
-                    <Users className="h-3.5 w-3.5 text-zinc-400" />
-                  ) : (
-                    <Building className="h-3.5 w-3.5 text-zinc-400" />
-                  )}
-                  <span className="text-sm text-zinc-300">
-                    {caseData.source === "customer" ? "Müşteri" : "Internal"}
-                  </span>
+                  {caseData.source === "customer" ? <Users className="h-3.5 w-3.5 text-zinc-400" /> : <Building className="h-3.5 w-3.5 text-zinc-400" />}
+                  <span className="text-sm text-zinc-300">{caseData.source === "customer" ? "Müşteri" : "Internal"}</span>
                 </div>
               </div>
 
-              {editMode ? (
-                <>
-                  <div>
-                    <label className="text-xs text-zinc-500">Marka</label>
-                    <select
-                      value={editBrandId}
-                      onChange={(e) => {
-                        setEditBrandId(e.target.value);
-                        setEditApplicationId("");
-                      }}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none"
-                    >
+              {/* Marka */}
+              {editingField === "brand" ? (
+                <div>
+                  <label className="text-xs text-zinc-500">Marka</label>
+                  <div className="flex items-center gap-1">
+                    <select value={editBrandId} onChange={(e) => { setEditBrandId(e.target.value); setEditApplicationId(""); }} autoFocus className="flex-1 px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none">
                       <option value="">Seçin</option>
-                      {brands.map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))}
+                      {brands.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
                     </select>
+                    <button onClick={() => handleSaveField("brand")} className="p-1.5 rounded-lg text-green-400 hover:bg-green-400/10"><Check className="h-4 w-4" /></button>
+                    <button onClick={cancelEditField} className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-400/10"><X className="h-4 w-4" /></button>
                   </div>
-                  <div>
-                    <label className="text-xs text-zinc-500">Uygulama</label>
-                    <select
-                      value={editApplicationId}
-                      onChange={(e) => setEditApplicationId(e.target.value)}
-                      disabled={!editBrandId}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none disabled:opacity-50"
-                    >
+                </div>
+              ) : (
+                <div className="flex items-center justify-between group">
+                  <span className="text-xs text-zinc-500">Marka</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-zinc-300">{caseData.brands?.name || "—"}</span>
+                    <button onClick={() => startEditField("brand")} className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-[#162238]/80 transition-all"><Pencil className="h-3 w-3 text-zinc-500" /></button>
+                  </div>
+                </div>
+              )}
+
+              {/* Uygulama */}
+              {editingField === "application" ? (
+                <div>
+                  <label className="text-xs text-zinc-500">Uygulama</label>
+                  <div className="flex items-center gap-1">
+                    <select value={editApplicationId} onChange={(e) => setEditApplicationId(e.target.value)} disabled={!editBrandId} autoFocus className="flex-1 px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none disabled:opacity-50">
                       <option value="">{editBrandId ? "Seçin" : "Önce marka seçin"}</option>
-                      {applications.map((a) => (
-                        <option key={a.id} value={a.id}>{a.name}</option>
-                      ))}
+                      {applications.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
                     </select>
+                    <button onClick={() => handleSaveField("application")} className="p-1.5 rounded-lg text-green-400 hover:bg-green-400/10"><Check className="h-4 w-4" /></button>
+                    <button onClick={cancelEditField} className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-400/10"><X className="h-4 w-4" /></button>
                   </div>
-                  <div>
-                    <label className="text-xs text-zinc-500">Müşteri İsmi</label>
-                    <div className="flex gap-1">
-                      <select
-                        value={editCustomerName}
-                        onChange={(e) => setEditCustomerName(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none"
-                      >
-                        <option value="">Müşteri seçin</option>
-                        {customers.map((c) => (
-                          <option key={c.id} value={c.name}>{c.name}</option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={handleAddCustomer}
-                        className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm"
-                        title="Yeni müşteri ekle"
-                      >
-                        +
-                      </button>
-                      {editCustomerName && (
-                        <button
-                          type="button"
-                          onClick={handleDeleteCustomer}
-                          className="px-2 py-1 rounded bg-[#162238]/60 border border-[#233554]/60 text-zinc-500 hover:text-red-400 transition-all"
-                          title="Sil"
-                        >
-                          −
-                        </button>
-                      )}
-                    </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between group">
+                  <span className="text-xs text-zinc-500">Uygulama</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-zinc-300">{caseData.applications?.name || "—"}</span>
+                    <button onClick={() => startEditField("application")} className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-[#162238]/80 transition-all"><Pencil className="h-3 w-3 text-zinc-500" /></button>
                   </div>
-                  <div>
-                    <label className="text-xs text-zinc-500">Öncelik</label>
-                    <select
-                      value={editPriority}
-                      onChange={(e) => setEditPriority(e.target.value as CaseData["priority"])}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none"
-                    >
+                </div>
+              )}
+
+              {/* Müşteri */}
+              {editingField === "customer" ? (
+                <div>
+                  <label className="text-xs text-zinc-500">Müşteri</label>
+                  <div className="flex items-center gap-1">
+                    <select value={editCustomerName} onChange={(e) => setEditCustomerName(e.target.value)} autoFocus className="flex-1 px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none">
+                      <option value="">Müşteri seçin</option>
+                      {customers.map((c) => (<option key={c.id} value={c.name}>{c.name}</option>))}
+                    </select>
+                    <button onClick={handleAddCustomer} className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm" title="Yeni müşteri ekle">+</button>
+                    <button onClick={() => handleSaveField("customer")} className="p-1.5 rounded-lg text-green-400 hover:bg-green-400/10"><Check className="h-4 w-4" /></button>
+                    <button onClick={cancelEditField} className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-400/10"><X className="h-4 w-4" /></button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between group">
+                  <span className="text-xs text-zinc-500">Müşteri</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-zinc-300">{caseData.customer_name || "—"}</span>
+                    <button onClick={() => startEditField("customer")} className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-[#162238]/80 transition-all"><Pencil className="h-3 w-3 text-zinc-500" /></button>
+                  </div>
+                </div>
+              )}
+
+              {/* Öncelik */}
+              {editingField === "priority" ? (
+                <div>
+                  <label className="text-xs text-zinc-500">Öncelik</label>
+                  <div className="flex items-center gap-1">
+                    <select value={editPriority} onChange={(e) => setEditPriority(e.target.value as CaseData["priority"])} autoFocus className="flex-1 px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none">
                       <option value="low">Düşük</option>
                       <option value="medium">Orta</option>
                       <option value="high">Yüksek</option>
                       <option value="urgent">Acil</option>
                     </select>
+                    <button onClick={() => handleSaveField("priority")} className="p-1.5 rounded-lg text-green-400 hover:bg-green-400/10"><Check className="h-4 w-4" /></button>
+                    <button onClick={cancelEditField} className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-400/10"><X className="h-4 w-4" /></button>
                   </div>
-                  <div>
-                    <label className="text-xs text-zinc-500">Açıklama</label>
-                    <textarea
-                      rows={4}
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none placeholder-zinc-500 resize-none"
-                      placeholder="Açıklama..."
-                    />
-                  </div>
-                </>
+                </div>
               ) : (
-                <>
-                  {caseData.brands && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-500">Marka</span>
-                      <span className="text-sm text-zinc-300">
-                        {caseData.brands.name}
-                      </span>
-                    </div>
-                  )}
-
-                  {caseData.applications && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-500">Uygulama</span>
-                      <span className="text-sm text-zinc-300">
-                        {caseData.applications.name}
-                      </span>
-                    </div>
-                  )}
-
-                  {caseData.customer_name && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-500">Müşteri</span>
-                      <span className="text-sm text-zinc-300">
-                        {caseData.customer_name}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500">Öncelik</span>
+                <div className="flex items-center justify-between group">
+                  <span className="text-xs text-zinc-500">Öncelik</span>
+                  <div className="flex items-center gap-1.5">
                     <PriorityBadge priority={caseData.priority} />
+                    <button onClick={() => startEditField("priority")} className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-[#162238]/80 transition-all"><Pencil className="h-3 w-3 text-zinc-500" /></button>
                   </div>
-                </>
+                </div>
               )}
 
               <div className="h-px bg-[#233554]/60" />
 
+              {/* Oluşturan */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-500">Oluşturan</span>
                 {caseData.profiles_cases_created_by && (
                   <div className="flex items-center gap-2">
-                    <UserAvatar
-                      name={caseData.profiles_cases_created_by.full_name}
-                      size="sm"
-                    />
-                    <span className="text-sm text-zinc-300">
-                      {caseData.profiles_cases_created_by.full_name}
-                    </span>
+                    <UserAvatar name={caseData.profiles_cases_created_by.full_name} size="sm" />
+                    <span className="text-sm text-zinc-300">{caseData.profiles_cases_created_by.full_name}</span>
                   </div>
                 )}
               </div>
 
+              {/* Atanan */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-500">Atanan</span>
-                {editMode ? (
-                  <select
-                    value={editAssignedTo}
-                    onChange={(e) => setEditAssignedTo(e.target.value)}
-                    className="px-2 py-1 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-xs focus:outline-none"
-                  >
-                    <option value="">Atanmamış</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>{u.full_name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <select
-                    value={caseData.assigned_to || ""}
-                    onChange={(e) => handleAssign(e.target.value)}
-                    className="px-2 py-1 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-xs focus:outline-none"
-                  >
-                    <option value="">Atanmamış</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>{u.full_name}</option>
-                    ))}
-                  </select>
-                )}
+                <select
+                  value={caseData.assigned_to || ""}
+                  onChange={(e) => handleAssign(e.target.value)}
+                  className="px-2 py-1 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-xs focus:outline-none"
+                >
+                  <option value="">Atanmamış</option>
+                  {users.map((u) => (<option key={u.id} value={u.id}>{u.full_name}</option>))}
+                </select>
               </div>
 
               <div className="h-px bg-[#233554]/60" />
 
+              {/* Oluşturulma */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-500">Oluşturulma</span>
-                <span className="text-sm text-zinc-300">
-                  {new Date(caseData.created_at).toLocaleDateString("tr-TR")}
-                </span>
+                <span className="text-sm text-zinc-300">{new Date(caseData.created_at).toLocaleDateString("tr-TR")}</span>
               </div>
 
+              {/* Geçen Süre */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-500">Geçen Süre</span>
                 <div className="flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5 text-indigo-400" />
                   <span className="text-sm text-indigo-400 font-medium">
-                    {formatDistanceToNow(new Date(caseData.created_at), {
-                      addSuffix: false,
-                      locale: tr,
-                    })}
+                    {formatDistanceToNow(new Date(caseData.created_at), { addSuffix: false, locale: tr })}
                   </span>
                 </div>
               </div>
@@ -635,64 +510,70 @@ export default function CaseDetailPage({
               {caseData.resolved_at && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-zinc-500">Çözülme</span>
-                  <span className="text-sm text-green-400">
-                    {new Date(caseData.resolved_at).toLocaleDateString("tr-TR")}
-                  </span>
+                  <span className="text-sm text-green-400">{new Date(caseData.resolved_at).toLocaleDateString("tr-TR")}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Status Change */}
-          {editMode ? null : (
-            allowedTransitions.length > 0 && (
-              <div className="glass rounded-2xl p-5 space-y-3">
-                <h3 className="text-sm font-bold text-zinc-100 tracking-wide">
-                  Durum Değiştir
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {allowedTransitions.map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => handleStatusChange(status)}
-                      className="px-3 py-1.5 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-zinc-300 text-xs font-medium hover:border-indigo-500/50 hover:text-indigo-400 transition-all"
-                    >
-                      {status === "in_progress"
-                        ? "İşleniyor"
-                        : status === "waiting"
-                        ? "Beklemede"
-                        : status === "resolved"
-                        ? "Çözüldü"
-                        : status === "closed"
-                        ? "Kapat"
-                        : "Aç"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )
-          )}
-
-          {/* Description */}
-          {editMode ? null : caseData.description ? (
+          {/* Durum Değiştir */}
+          {allowedTransitions.length > 0 && (
             <div className="glass rounded-2xl p-5 space-y-3">
-              <h3 className="text-sm font-bold text-zinc-100 tracking-wide">
-                Açıklama
-              </h3>
-              <p className="text-sm text-zinc-400 whitespace-pre-wrap">
-                {caseData.description}
-              </p>
+              <h3 className="text-sm font-bold text-zinc-100 tracking-wide">Durum Değiştir</h3>
+              <div className="flex flex-wrap gap-2">
+                {allowedTransitions.map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => handleStatusChange(status)}
+                    className="px-3 py-1.5 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-zinc-300 text-xs font-medium hover:border-indigo-500/50 hover:text-indigo-400 transition-all"
+                  >
+                    {status === "in_progress" ? "İşleniyor" : status === "closed" ? "Kapat" : "Aç"}
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : null}
+          )}
         </div>
 
-        {/* Right Column - Timeline & Notes */}
+        {/* Right Column - Description, Timeline & Notes */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Description */}
+          {caseData.description || editingField === "description" ? (
+            <div className="glass rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-zinc-100 tracking-wide">Açıklama</h3>
+                {editingField !== "description" && (
+                  <button onClick={() => startEditField("description")} className="p-1 rounded-lg hover:bg-[#162238]/80 transition-all"><Pencil className="h-3.5 w-3.5 text-zinc-500" /></button>
+                )}
+              </div>
+              {editingField === "description" ? (
+                <div className="space-y-2">
+                  <textarea
+                    rows={4}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    autoFocus
+                    className="w-full px-3 py-2 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none placeholder-zinc-500 resize-none"
+                    placeholder="Açıklama..."
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={() => handleSaveField("description")} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium transition-all"><Check className="h-3 w-3" /> Kaydet</button>
+                    <button onClick={cancelEditField} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white text-xs font-medium transition-all"><X className="h-3 w-3" /> İptal</button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-400 whitespace-pre-wrap">{caseData.description}</p>
+              )}
+            </div>
+          ) : (
+            <div className="glass rounded-2xl p-5">
+              <button onClick={() => startEditField("description")} className="text-sm text-zinc-500 hover:text-zinc-300 transition-all">+ Açıklama ekle</button>
+            </div>
+          )}
+
           {/* Add Note */}
           <form onSubmit={handleAddNote} className="glass rounded-2xl p-5 space-y-3">
-            <h3 className="text-sm font-bold text-zinc-100 tracking-wide">
-              Not Ekle
-            </h3>
+            <h3 className="text-sm font-bold text-zinc-100 tracking-wide">Not Ekle</h3>
             <textarea
               rows={3}
               placeholder="Notunuzu yazın..."
@@ -723,11 +604,8 @@ export default function CaseDetailPage({
 
           {/* Timeline */}
           <div className="glass rounded-2xl p-5">
-            <h3 className="text-sm font-bold text-zinc-100 tracking-wide mb-4">
-              Aktivite Akışı
-            </h3>
-
-            <CaseTimeline caseId={caseData.id} refreshKey={refreshKey} />
+            <h3 className="text-sm font-bold text-zinc-100 tracking-wide mb-4">Aktivite Akışı</h3>
+            <CaseTimeline caseId={caseData.id} refreshKey={refreshKey} currentUserId={currentUserId} onRefresh={() => setRefreshKey((k) => k + 1)} />
           </div>
         </div>
       </div>

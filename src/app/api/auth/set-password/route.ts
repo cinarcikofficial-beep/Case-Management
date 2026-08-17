@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+function formatName(email: string): string {
+  const prefix = email.split("@")[0];
+  return prefix
+    .replace(/[._-]/g, " ")
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
@@ -33,7 +42,7 @@ export async function POST(req: NextRequest) {
           email,
           password,
           email_confirm: true,
-          user_metadata: { full_name: email.split("@")[0] },
+          user_metadata: { full_name: formatName(email) },
         });
 
       if (createError) {
@@ -47,7 +56,7 @@ export async function POST(req: NextRequest) {
       await admin.from("profiles").insert({
         id: newUser.user.id,
         email,
-        full_name: email.split("@")[0],
+        full_name: formatName(email),
         role: "member",
       });
     } else {

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
-import { ArrowLeft, Eye, Calendar, User } from "lucide-react";
+import { ArrowLeft, Eye, Calendar, Pencil, Trash2 } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { KB_CATEGORIES } from "@/lib/constants";
 import type { Tables } from "@/types/database";
@@ -70,6 +70,17 @@ export default function ArticleDetailPage({
 
   if (!article) return null;
 
+  async function handleDelete() {
+    if (!confirm(`"${article!.title}" makalesini silmek istediğinizden emin misiniz?`)) return;
+    const { error } = await supabase.from("knowledge_base").delete().eq("id", id);
+    if (error) {
+      toast.error("Silinemedi: " + error.message);
+    } else {
+      toast.success("Makale silindi.");
+      router.push("/knowledge-base");
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
@@ -86,6 +97,22 @@ export default function ArticleDetailPage({
           <h1 className="text-2xl font-bold text-zinc-100 mt-2">
             {article.title}
           </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/knowledge-base/${article.id}/edit`}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white text-sm font-medium transition-all"
+          >
+            <Pencil className="h-4 w-4" />
+            Düzenle
+          </Link>
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-sm font-medium transition-all"
+          >
+            <Trash2 className="h-4 w-4" />
+            Sil
+          </button>
         </div>
       </div>
 
