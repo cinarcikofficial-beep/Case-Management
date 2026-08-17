@@ -57,9 +57,12 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar userRole={userRole} />
-      <div className="flex-1 ml-72">
+      <div className="flex-1 ml-72 flex flex-col">
         <Topbar />
-        <main className="p-6">{children}</main>
+        <main className="p-6 flex-1">{children}</main>
+        <footer className="px-6 py-4 border-t border-[#233554]/30">
+          <p className="text-xs text-zinc-600 text-center">@Designed By Kerim KAPLAN</p>
+        </footer>
       </div>
     </div>
   );
