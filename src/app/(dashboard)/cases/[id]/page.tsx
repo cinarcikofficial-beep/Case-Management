@@ -14,11 +14,13 @@ import {
   Send,
   Check,
   X,
+  Trash2,
 } from "lucide-react";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { CaseTimeline } from "@/components/cases/CaseTimeline";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { STATUS_TRANSITIONS } from "@/lib/constants";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -56,6 +58,7 @@ export default function CaseDetailPage({
   const [isInternal, setIsInternal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -299,6 +302,94 @@ export default function CaseDetailPage({
     }
   }
 
+  async function handleAddBrand() {
+    const newName = prompt("Yeni marka ismi:");
+    if (newName && newName.trim()) {
+      const trimmed = newName.trim();
+      const existing = brands.find((b) => b.name === trimmed);
+      if (existing) {
+        setEditBrandId(existing.id);
+        setEditApplicationId("");
+        toast.success(`"${trimmed}" marka olarak seçildi.`);
+      } else {
+        const { data, error } = await supabase
+          .from("brands")
+          .insert({ name: trimmed })
+          .select()
+          .single();
+        if (error) {
+          if (error.code === "23505") {
+            const fresh = brands.find((b) => b.name === trimmed);
+            if (fresh) {
+              setEditBrandId(fresh.id);
+              setEditApplicationId("");
+              toast.success(`"${trimmed}" marka olarak seçildi.`);
+            }
+          } else {
+            toast.error("Marka eklenemedi: " + error.message);
+          }
+        } else if (data) {
+          setBrands((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+          setEditBrandId(data.id);
+          setEditApplicationId("");
+          toast.success(`"${trimmed}" marka olarak kaydedildi.`);
+        }
+      }
+    }
+  }
+
+  async function handleAddApplication() {
+    if (!editBrandId) { toast.error("Önce bir marka seçin."); return; }
+    const newName = prompt("Yeni uygulama ismi:");
+    if (newName && newName.trim()) {
+      const trimmed = newName.trim();
+      const existing = applications.find((a) => a.name === trimmed && a.brand_id === editBrandId);
+      if (existing) {
+        setEditApplicationId(existing.id);
+        toast.success(`"${trimmed}" uygulama olarak seçildi.`);
+      } else {
+        const { data, error } = await supabase
+          .from("applications")
+          .insert({ name: trimmed, brand_id: editBrandId })
+          .select()
+          .single();
+        if (error) {
+          if (error.code === "23505") {
+            const fresh = applications.find((a) => a.name === trimmed && a.brand_id === editBrandId);
+            if (fresh) {
+              setEditApplicationId(fresh.id);
+              toast.success(`"${trimmed}" uygulama olarak seçildi.`);
+            }
+          } else {
+            toast.error("Uygulama eklenemedi: " + error.message);
+          }
+        } else if (data) {
+          setApplications((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+          setEditApplicationId(data.id);
+          toast.success(`"${trimmed}" uygulama olarak kaydedildi.`);
+        }
+      }
+    }
+  }
+
+  async function handleDeleteCase() {
+    if (!caseData) return;
+    setShowDeleteConfirm(true);
+  }
+
+  async function confirmDeleteCase() {
+    if (!caseData) return;
+    const caseNum = caseData.case_number;
+    const { error } = await supabase.from("cases").delete().eq("id", caseData.id);
+    if (error) {
+      toast.error("Silinemedi: " + error.message);
+    } else {
+      await supabase.rpc("reset_case_number_if_needed", { p_case_number: caseNum });
+      toast.success("Vaka silindi. Vaka numarası yeniden kullanıma hazır.");
+      router.push("/cases");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -321,7 +412,7 @@ export default function CaseDetailPage({
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-3">
             <span className="text-sm font-mono text-zinc-500">
               VT-{new Date(caseData.created_at).getFullYear()}-
@@ -376,6 +467,7 @@ export default function CaseDetailPage({
                       <option value="">Seçin</option>
                       {brands.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
                     </select>
+                    <button onClick={handleAddBrand} className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm" title="Yeni marka ekle">+</button>
                     <button onClick={() => handleSaveField("brand")} className="p-1.5 rounded-lg text-green-400 hover:bg-green-400/10"><Check className="h-4 w-4" /></button>
                     <button onClick={cancelEditField} className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-400/10"><X className="h-4 w-4" /></button>
                   </div>
@@ -399,6 +491,7 @@ export default function CaseDetailPage({
                       <option value="">{editBrandId ? "Seçin" : "Önce marka seçin"}</option>
                       {applications.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
                     </select>
+                    <button onClick={handleAddApplication} className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm" title="Yeni uygulama ekle">+</button>
                     <button onClick={() => handleSaveField("application")} className="p-1.5 rounded-lg text-green-400 hover:bg-green-400/10"><Check className="h-4 w-4" /></button>
                     <button onClick={cancelEditField} className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-400/10"><X className="h-4 w-4" /></button>
                   </div>
@@ -517,22 +610,26 @@ export default function CaseDetailPage({
           </div>
 
           {/* Durum Değiştir */}
-          {allowedTransitions.length > 0 && (
-            <div className="glass rounded-2xl p-5 space-y-3">
-              <h3 className="text-sm font-bold text-zinc-100 tracking-wide">Durum Değiştir</h3>
-              <div className="flex flex-wrap gap-2">
-                {allowedTransitions.map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => handleStatusChange(status)}
-                    className="px-3 py-1.5 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-zinc-300 text-xs font-medium hover:border-indigo-500/50 hover:text-indigo-400 transition-all"
-                  >
-                    {status === "in_progress" ? "İşleniyor" : status === "closed" ? "Kapat" : "Aç"}
-                  </button>
-                ))}
-              </div>
+          <div className="glass rounded-2xl p-5 space-y-3">
+            <h3 className="text-sm font-bold text-zinc-100 tracking-wide">Durum Değiştir</h3>
+            <div className="flex flex-wrap gap-2">
+              {allowedTransitions.map((status) => (
+                <button
+                  key={status}
+                  onClick={() => handleStatusChange(status)}
+                  className="px-3 py-1.5 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-zinc-300 text-xs font-medium hover:border-indigo-500/50 hover:text-indigo-400 transition-all"
+                >
+                  {status === "in_progress" ? "İşleniyor" : status === "closed" ? "Kapat" : "Aç"}
+                </button>
+              ))}
+              <button
+                onClick={handleDeleteCase}
+                className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium hover:bg-red-500/20 hover:text-red-300 transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="h-3 w-3" /> Vakayı Sil
+              </button>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Right Column - Description, Timeline & Notes */}
@@ -609,6 +706,17 @@ export default function CaseDetailPage({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Vakayı Sil"
+        message={`Bu kaydı silmek istediğinize emin misiniz?\n\nVaka No: VT-${caseData ? new Date(caseData.created_at).getFullYear() : ""}-${caseData ? String(caseData.case_number).padStart(4, "0") : ""}\nBaşlık: ${caseData?.title || ""}\n\nBu işlem geri alınamaz. Silinen vaka numarası yeni bir kayda verilecektir.`}
+        confirmLabel="Sil"
+        cancelLabel="İptal"
+        danger
+        onConfirm={confirmDeleteCase}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

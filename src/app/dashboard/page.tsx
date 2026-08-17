@@ -52,7 +52,8 @@ export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
-  const [assignedFilter, setAssignedFilter] = useState<"all" | "me" | "none">("all");
+  const [assignedFilter, setAssignedFilter] = useState<"all" | "me" | "none" | string>("all");
+  const [assignableUsers, setAssignableUsers] = useState<{ id: string; full_name: string }[]>([]);
   const [activeStatFilter, setActiveStatFilter] = useState<string | null>(null);
   const [sortField, setSortField] = useState<string>("created_at");
   const [sortAsc, setSortAsc] = useState(false);
@@ -120,11 +121,10 @@ export default function DashboardPage() {
 
     if (statusFilter) query = query.eq("status", statusFilter);
     if (sourceFilter) query = query.eq("source", sourceFilter);
-    if (assignedFilter === "me" && !activeStatFilter) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) query = query.eq("assigned_to", user.id);
-    } else if (assignedFilter === "none" && !activeStatFilter) {
+    if (assignedFilter === "none" && !activeStatFilter) {
       query = query.is("assigned_to", null);
+    } else if (assignedFilter !== "all" && assignedFilter !== "none" && !activeStatFilter) {
+      query = query.eq("assigned_to", assignedFilter);
     }
     let brandIds: string[] | null = null;
     let applicationIds: string[] | null = null;
@@ -225,6 +225,14 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchCases();
   }, [fetchCases]);
+
+  useEffect(() => {
+    async function fetchUsers() {
+      const { data } = await supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name");
+      if (data) setAssignableUsers(data);
+    }
+    fetchUsers();
+  }, [supabase]);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -425,15 +433,17 @@ export default function DashboardPage() {
           <select
             value={assignedFilter}
             onChange={(e) => {
-              setAssignedFilter(e.target.value as "all" | "me" | "none");
+              setAssignedFilter(e.target.value);
               setActiveStatFilter(null);
               setPage(0);
             }}
             className="px-3 py-2.5 rounded-xl bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80 transition-all"
           >
             <option value="all">Tüm Atamalar</option>
-            <option value="me">Bana Atanan</option>
             <option value="none">Atanmamış</option>
+            {assignableUsers.map((u) => (
+              <option key={u.id} value={u.id}>{u.full_name}</option>
+            ))}
           </select>
 
           <button

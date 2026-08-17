@@ -35,6 +35,7 @@ export default function LoginPage() {
         password,
       });
       if (error) throw error;
+      sessionStorage.setItem("session_active", "true");
       toast.success("Giriş başarılı!");
       router.push("/dashboard");
     } catch (error: unknown) {
@@ -113,6 +114,7 @@ export default function LoginPage() {
       });
       if (signInError) throw signInError;
 
+      sessionStorage.setItem("session_active", "true");
       toast.success("Hesabınız oluşturuldu! Giriş yapılıyor...");
       router.push("/dashboard");
     } catch (error: unknown) {

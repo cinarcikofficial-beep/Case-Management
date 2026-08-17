@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Search, Eye, Tag, Pencil, Trash2 } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
 import type { Tables } from "@/types/database";
 
@@ -18,6 +19,7 @@ export default function KnowledgeBasePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -53,14 +55,19 @@ export default function KnowledgeBasePage() {
     await fetchArticles();
   }
 
-  async function handleDelete(id: string, title: string) {
-    if (!confirm(`"${title}" makalesini silmek istediğinizden emin misiniz?`)) return;
-    const { error } = await supabase.from("knowledge_base").delete().eq("id", id);
+  function handleDelete(id: string, title: string) {
+    setDeleteTarget({ id, title });
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const { error } = await supabase.from("knowledge_base").delete().eq("id", deleteTarget.id);
     if (error) {
       toast.error("Silinemedi: " + error.message);
     } else {
       toast.success("Makale silindi.");
-      setArticles((prev) => prev.filter((a) => a.id !== id));
+      setArticles((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+      setDeleteTarget(null);
     }
   }
 
@@ -183,6 +190,17 @@ export default function KnowledgeBasePage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Makaleyi Sil"
+        message={`"${deleteTarget?.title || ""}" makalesini silmek istediğinizden emin misiniz?`}
+        confirmLabel="Sil"
+        cancelLabel="İptal"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

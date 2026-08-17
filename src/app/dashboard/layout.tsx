@@ -18,6 +18,12 @@ export default function DashboardLayout({
 
   useEffect(() => {
     async function checkAuth() {
+      if (!sessionStorage.getItem("session_active")) {
+        await supabase.auth.signOut();
+        router.replace("/login");
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();

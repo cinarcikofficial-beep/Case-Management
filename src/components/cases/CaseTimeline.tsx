@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Pencil, Trash2, Check, X, Send } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -31,6 +32,7 @@ export function CaseTimeline({ caseId, refreshKey, currentUserId, onRefresh }: C
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -112,14 +114,19 @@ export function CaseTimeline({ caseId, refreshKey, currentUserId, onRefresh }: C
     fetchTimeline();
   }, [caseId, refreshKey, supabase]);
 
-  async function handleDeleteNote(id: string) {
-    if (!confirm("Bu notu silmek istediğinizden emin misiniz?")) return;
-    const { error } = await supabase.from("case_notes").delete().eq("id", id);
+  function handleDeleteNote(id: string) {
+    setDeleteTargetId(id);
+  }
+
+  async function confirmDeleteNote() {
+    if (!deleteTargetId) return;
+    const { error } = await supabase.from("case_notes").delete().eq("id", deleteTargetId);
     if (error) {
       toast.error("Silinemedi: " + error.message);
     } else {
       toast.success("Not silindi.");
-      setItems((prev) => prev.filter((item) => item.id !== id));
+      setItems((prev) => prev.filter((item) => item.id !== deleteTargetId));
+      setDeleteTargetId(null);
       onRefresh?.();
     }
   }
@@ -262,6 +269,17 @@ export function CaseTimeline({ caseId, refreshKey, currentUserId, onRefresh }: C
           </div>
         ))
       )}
+
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        title="Notu Sil"
+        message="Bu notu silmek istediğinizden emin misiniz?"
+        confirmLabel="Sil"
+        cancelLabel="İptal"
+        danger
+        onConfirm={confirmDeleteNote}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }

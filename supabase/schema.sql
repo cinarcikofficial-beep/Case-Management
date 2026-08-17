@@ -296,3 +296,18 @@ CREATE TRIGGER update_cases_updated_at
 CREATE TRIGGER update_knowledge_base_updated_at
   BEFORE UPDATE ON knowledge_base
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Vaka numarasını sıfırlama fonksiyonu (silinen vakadan sonra)
+CREATE OR REPLACE FUNCTION reset_case_number_if_needed(p_case_number INT)
+RETURNS VOID AS $$
+DECLARE
+  current_val INT;
+  max_val INT;
+BEGIN
+  SELECT last_value INTO current_val FROM cases_case_number_seq;
+  SELECT COALESCE(MAX(case_number), 0) INTO max_val FROM cases;
+  IF p_case_number >= current_val THEN
+    PERFORM setval('cases_case_number_seq', GREATEST(max_val, p_case_number - 1));
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
