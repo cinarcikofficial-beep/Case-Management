@@ -41,21 +41,17 @@ export function Sidebar({ userRole }: SidebarProps) {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-[#0b111e] border-r border-[#233554]/60 flex flex-col z-50">
+    <aside className="fixed left-0 top-0 h-full w-72 bg-[#0b111e] border-r border-[#233554]/60 flex flex-col z-50">
       {/* Logo */}
-      <div className="p-6 border-b border-[#233554]/60">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center overflow-hidden">
-            <Image src="/verytech_beyaz.png" alt="Verytech" width={56} height={56} className="object-contain" />
-          </div>
-          <div>
-            <h1 className="text-sm font-bold text-zinc-100 tracking-wide">
-              Verytech
-            </h1>
-            <p className="text-[11px] text-zinc-400 font-medium">
-              Case Management & Knowledge Base
-            </p>
-          </div>
+      <div className="p-6 border-b border-[#233554]/60 text-center">
+        <Link href="/dashboard" className="flex flex-col items-center">
+          <Image src="/verytech_beyaz.png" alt="Verytech" width={140} height={140} className="object-contain mb-3" />
+          <h1 className="text-2xl font-bold text-white tracking-wide">
+            Verytech
+          </h1>
+          <p className="text-sm font-semibold text-slate-300">
+            Case Management & Knowledge Base
+          </p>
         </Link>
       </div>
 

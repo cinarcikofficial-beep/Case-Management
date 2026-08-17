@@ -51,7 +51,7 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar userRole={userRole} />
-      <div className="flex-1 ml-64">
+      <div className="flex-1 ml-72">
         <Topbar />
         <main className="p-6">{children}</main>
       </div>
