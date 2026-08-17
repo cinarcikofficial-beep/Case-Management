@@ -61,7 +61,7 @@ export default function DashboardLayout({
         <Topbar />
         <main className="p-6 flex-1">{children}</main>
         <footer className="px-6 py-4 border-t border-[#233554]/30">
-          <p className="text-xs text-zinc-600 text-center">@Designed By Kerim KAPLAN</p>
+          <p className="text-xs text-zinc-600 text-center">@2026 - Designed By Kerim KAPLAN</p>
         </footer>
       </div>
     </div>
