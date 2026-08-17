@@ -45,15 +45,15 @@ export function Sidebar({ userRole }: SidebarProps) {
       {/* Logo */}
       <div className="p-6 border-b border-[#233554]/60">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden">
-            <Image src="/verytech_beyaz.png" alt="Verytech" width={36} height={36} className="object-contain" />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden">
+            <Image src="/verytech_beyaz.png" alt="Verytech" width={48} height={48} className="object-contain" />
           </div>
           <div>
             <h1 className="text-sm font-bold text-zinc-100 tracking-wide">
               Verytech
             </h1>
-            <p className="text-[10px] text-zinc-500 tracking-wider uppercase">
-              Case Management
+            <p className="text-[10px] text-zinc-500 tracking-wider">
+              Case Management & Knowledge Base
             </p>
           </div>
         </Link>
