@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -44,8 +45,8 @@ export function Sidebar({ userRole }: SidebarProps) {
       {/* Logo */}
       <div className="p-6 border-b border-[#233554]/60">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-sm">VT</span>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden">
+            <Image src="/verytech_beyaz.png" alt="Verytech" width={36} height={36} className="object-contain" />
           </div>
           <div>
             <h1 className="text-sm font-bold text-zinc-100 tracking-wide">

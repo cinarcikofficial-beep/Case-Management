@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { APP_DOMAIN } from "@/lib/constants";
+import Image from "next/image";
 
 type View =
   | "login"
@@ -131,8 +132,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
       <div className="w-full max-w-[400px] bg-[#1e293b] border border-[#334155] rounded-2xl p-10 shadow-[0_10px_25px_rgba(0,0,0,0.3)] text-center">
         <div className="flex justify-center mb-6">
-          <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-xl">VT</span>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+            <Image src="/verytech_beyaz.png" alt="Verytech" width={56} height={56} className="object-contain" />
           </div>
         </div>
         <h1 className="text-xl font-bold text-white mb-1">Verytech</h1>
