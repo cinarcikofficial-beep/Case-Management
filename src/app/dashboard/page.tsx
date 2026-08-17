@@ -155,6 +155,8 @@ export default function DashboardPage() {
       );
     } else if (activeStatFilter === "myCases") {
       query = query.eq("assigned_to", user.id);
+    } else if (activeStatFilter === "open") {
+      query = query.in("status", ["open", "in_progress"]);
     }
 
     const dbSortFields: Record<string, string> = {
@@ -245,7 +247,8 @@ export default function DashboardPage() {
     setPage(0);
     setSearch("");
     setSourceFilter("");
-    if (type === "today" || type === "myCases") {
+    setAssignedFilter("all");
+    if (type === "today" || type === "myCases" || type === "open") {
       setStatusFilter("");
       setActiveStatFilter(activeStatFilter === type ? null : type);
     } else {
@@ -262,7 +265,16 @@ export default function DashboardPage() {
       color: "text-blue-400",
       bg: "bg-blue-500/10",
       type: "open",
-      active: statusFilter === "open",
+      active: activeStatFilter === "open",
+    },
+    {
+      title: "Bugünkü Vakalar",
+      value: stats.todayCases,
+      icon: Clock,
+      color: "text-orange-400",
+      bg: "bg-orange-500/10",
+      type: "today",
+      active: activeStatFilter === "today",
     },
     {
       title: "Kapanan Vakalar",
@@ -274,16 +286,7 @@ export default function DashboardPage() {
       active: statusFilter === "closed",
     },
     {
-      title: "Bugünkü Yeni Vakalar",
-      value: stats.todayCases,
-      icon: Clock,
-      color: "text-orange-400",
-      bg: "bg-orange-500/10",
-      type: "today",
-      active: activeStatFilter === "today",
-    },
-    {
-      title: "Bana Atanan Vakalar",
+      title: "Bana Atanan",
       value: stats.myCases,
       icon: AlertCircle,
       color: "text-indigo-400",
