@@ -57,7 +57,7 @@ export default function EditCasePage({
         setAssignedTo(c.assigned_to || "");
       } else {
         toast.error("Vaka bulunamadı.");
-        router.push("/cases");
+        router.push("/dashboard");
       }
 
       if (brandsRes.data) setBrands(brandsRes.data);

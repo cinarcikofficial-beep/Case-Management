@@ -110,7 +110,7 @@ export default function CaseDetailPage({
         setEditCustomerName(caseDataObj.customer_name || "");
       } else {
         toast.error("Vaka bulunamadı.");
-        router.push("/cases");
+        router.push("/dashboard");
       }
       setLoading(false);
     }
@@ -386,7 +386,7 @@ export default function CaseDetailPage({
     } else {
       await supabase.rpc("reset_case_number_if_needed", { p_case_number: caseNum });
       toast.success("Vaka silindi. Vaka numarası yeniden kullanıma hazır.");
-      router.push("/cases");
+      router.push("/dashboard");
     }
   }
 
@@ -407,7 +407,7 @@ export default function CaseDetailPage({
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
-          href="/cases"
+          href="/dashboard"
           className="p-2 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white transition-all"
         >
           <ArrowLeft className="h-5 w-5" />

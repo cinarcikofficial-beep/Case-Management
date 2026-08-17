@@ -119,7 +119,7 @@ export default function NewCasePage() {
       toast.error("Vaka oluşturulurken hata oluştu: " + error.message);
     } else {
       toast.success("Vaka başarıyla oluşturuldu!");
-      router.push("/cases");
+      router.push("/dashboard");
     }
     setLoading(false);
   }
@@ -129,7 +129,7 @@ export default function NewCasePage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
-          href="/cases"
+          href="/dashboard"
           className="p-2 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white transition-all"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -586,7 +586,7 @@ export default function NewCasePage() {
         {/* Submit */}
         <div className="flex justify-end gap-3 pt-4">
           <Link
-            href="/cases"
+            href="/dashboard"
             className="px-6 py-2.5 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 text-sm font-medium hover:text-white transition-all"
           >
             İptal
