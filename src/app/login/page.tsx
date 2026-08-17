@@ -132,12 +132,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
       <div className="w-full max-w-[400px] bg-[#1e293b] border border-[#334155] rounded-2xl p-10 shadow-[0_10px_25px_rgba(0,0,0,0.3)] text-center">
         <div className="flex justify-center mb-6">
-          <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-            <Image src="/verytech_beyaz.png" alt="Verytech" width={96} height={96} className="object-contain" />
+          <div className="w-32 h-32 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+            <Image src="/verytech_beyaz.png" alt="Verytech" width={128} height={128} className="object-contain" />
           </div>
         </div>
-        <h1 className="text-xl font-bold text-white mb-1">Verytech</h1>
-        <p className="text-xs text-slate-400 mb-4">Case Management & Knowledge Base</p>
+        <h1 className="text-2xl font-bold text-white mb-1 tracking-wide">Verytech</h1>
+        <p className="text-sm font-semibold text-slate-300 mb-4">Case Management & Knowledge Base</p>
         <p className="text-sm text-slate-400 mb-6">
           {view === "login" && "Hesabınıza giriş yapın"}
           {view === "register" && "Yeni hesap oluşturun"}
