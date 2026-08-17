@@ -21,6 +21,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const url = new URL(request.url);
+  const testEmail = url.searchParams.get("test");
+
   const { data: cases, error } = await supabase
     .from("cases")
     .select("case_number, title, status, priority, source, customer_name, created_at, assigned_to, profiles_cases_assigned_to:assigned_to(full_name, email)")
@@ -45,6 +48,16 @@ export async function GET(request: Request) {
     high: "Yüksek",
     urgent: "Acil",
   };
+  const priorityColor: Record<string, string> = {
+    urgent: { bg: "#fef2f2", text: "#dc2626", border: "#fecaca" },
+    high: { bg: "#fff7ed", text: "#ea580c", border: "#fed7aa" },
+    medium: { bg: "#fefce8", text: "#ca8a04", border: "#fef08a" },
+    low: { bg: "#f0fdf4", text: "#16a34a", border: "#bbf7d0" },
+  };
+  const statusColor: Record<string, { bg: string; text: string; border: string }> = {
+    open: { bg: "#eff6ff", text: "#2563eb", border: "#bfdbfe" },
+    in_progress: { bg: "#fffbeb", text: "#d97706", border: "#fde68a" },
+  };
 
   const platformUrl = "https://case-management-zeta.vercel.app";
   const today = new Date().toLocaleDateString("tr-TR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -54,76 +67,136 @@ export async function GET(request: Request) {
       const profile = c.profiles_cases_assigned_to as unknown as { full_name: string } | null;
       const year = new Date(c.created_at).getFullYear();
       const num = String(c.case_number).padStart(4, "0");
-      const bgColor = i % 2 === 0 ? "#ffffff" : "#f9fafb";
-      const priorityColor: Record<string, string> = { urgent: "#dc2626", high: "#f97316", medium: "#eab308", low: "#22c55e" };
-      const statusColor: Record<string, string> = { open: "#3b82f6", in_progress: "#f59e0b" };
+      const bgColor = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+      const sc = statusColor[c.status] || { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" };
+      const pc = (priorityColor[c.priority] || { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" }) as { bg: string; text: string; border: string };
+
       return `
         <tr style="background:${bgColor};">
-          <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;font-family:'Courier New',monospace;font-size:13px;color:#6366f1;font-weight:600;">VT-${year}-${num}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#1f2937;">${c.title}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;font-size:12px;">
-            <span style="background:${statusColor[c.status] || "#6b7280"}22;color:${statusColor[c.status] || "#6b7280"};padding:3px 10px;border-radius:12px;font-weight:600;">${statusMap[c.status] || c.status}</span>
+          <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:13px;color:#6366f1;font-weight:700;">VT-${year}-${num}</td>
+          <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;font-weight:500;">${c.title}</td>
+          <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">
+            <span style="background:${sc.bg};color:${sc.text};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid ${sc.border};display:inline-block;">${statusMap[c.status] || c.status}</span>
           </td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;font-size:12px;">
-            <span style="background:${priorityColor[c.priority] || "#6b7280"}22;color:${priorityColor[c.priority] || "#6b7280"};padding:3px 10px;border-radius:12px;font-weight:600;">${priorityMap[c.priority] || c.priority}</span>
+          <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">
+            <span style="background:${pc.bg};color:${pc.text};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid ${pc.border};display:inline-block;">${priorityMap[c.priority] || c.priority}</span>
           </td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;color:${profile ? "#1f2937" : "#9ca3af"};">${profile?.full_name || "Atanmamış"}</td>
+          <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;font-size:13px;color:${profile ? "#1e293b" : "#94a3b8"};font-weight:${profile ? "500" : "400"};">${profile?.full_name || "Atanmamış"}</td>
         </tr>`;
     })
     .join("");
 
   const html = `
-    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:860px;margin:0 auto;padding:0;background:#f3f4f6;">
-      <div style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);padding:32px 40px;border-radius:16px 16px 0 0;">
-        <h1 style="color:#ffffff;font-size:22px;margin:0;font-weight:700;">Verytech Case Management</h1>
-        <p style="color:#c7d2fe;font-size:14px;margin:6px 0 0;">Günlük Vaka Raporu</p>
-      </div>
-      <div style="background:#ffffff;padding:32px 40px;border-radius:0 0 16px 16px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
-          <div>
-            <p style="color:#6b7280;font-size:13px;margin:0;">Rapor Tarihi</p>
-            <p style="color:#1f2937;font-size:15px;margin:4px 0 0;font-weight:600;">${today}</p>
-          </div>
-          <div style="text-align:right;">
-            <p style="color:#6b7280;font-size:13px;margin:0;">Toplam Aktif Vaka</p>
-            <p style="color:#4f46e5;font-size:28px;margin:4px 0 0;font-weight:800;">${cases.length}</p>
-          </div>
-        </div>
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="margin:0;padding:0;background:#ffffff;font-family:'Segoe UI',Arial,sans-serif;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;">
+        <tr>
+          <td align="center" style="padding:40px 20px;">
+            <table role="presentation" width="820" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08),0 4px 12px rgba(0,0,0,0.04);">
 
-        <table style="width:100%;border-collapse:collapse;margin-top:8px;">
-          <thead>
-            <tr style="background:#f3f4f6;">
-              <th style="padding:12px 14px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e5e7eb;">Vaka No</th>
-              <th style="padding:12px 14px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e5e7eb;">Başlık</th>
-              <th style="padding:12px 14px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e5e7eb;">Durum</th>
-              <th style="padding:12px 14px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e5e7eb;">Öncelik</th>
-              <th style="padding:12px 14px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e5e7eb;">Atanan</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
+              <!-- Header -->
+              <tr>
+                <td style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 50%,#a855f7 100%);padding:36px 44px;">
+                  <table width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td>
+                        <h1 style="color:#ffffff;font-size:24px;margin:0;font-weight:800;letter-spacing:-0.3px;">Verytech Case Management</h1>
+                        <p style="color:rgba(255,255,255,0.8);font-size:14px;margin:6px 0 0;font-weight:400;">Günlük Vaka Raporu</p>
+                      </td>
+                      <td align="right" valign="top">
+                        <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:12px 20px;display:inline-block;">
+                          <p style="color:rgba(255,255,255,0.7);font-size:11px;margin:0;text-transform:uppercase;letter-spacing:1px;">Aktif Vaka</p>
+                          <p style="color:#ffffff;font-size:32px;margin:2px 0 0;font-weight:800;">${cases.length}</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
 
-        <div style="margin-top:32px;text-align:center;">
-          <a href="${platformUrl}" style="display:inline-block;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:10px;font-size:14px;font-weight:600;letter-spacing:0.3px;">
-            Platforma Git →
-          </a>
-        </div>
+              <!-- Date Bar -->
+              <tr>
+                <td style="background:#f8fafc;padding:16px 44px;border-bottom:1px solid #e2e8f0;">
+                  <table width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td>
+                        <span style="color:#64748b;font-size:13px;">${today}</span>
+                      </td>
+                      <td align="right">
+                        <span style="color:#94a3b8;font-size:12px;">Open & İşleniyor</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
 
-        <div style="margin-top:28px;padding-top:20px;border-top:1px solid #e5e7eb;text-align:center;">
-          <p style="color:#9ca3af;font-size:11px;margin:0;">Bu otomatik rapor Verytech Case Management tarafından gönderilmiştir.</p>
-          <p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">Her gün saat 09:00'da gönderilir.</p>
-        </div>
-      </div>
-    </div>`;
+              <!-- Table -->
+              <tr>
+                <td style="padding:0 44px;">
+                  <table width="100%" cellspacing="0" cellpadding="0" style="margin-top:20px;">
+                    <thead>
+                      <tr>
+                        <th style="padding:12px 16px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;border-bottom:2px solid #e2e8f0;background:#f8fafc;">Vaka No</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;border-bottom:2px solid #e2e8f0;background:#f8fafc;">Başlık</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;border-bottom:2px solid #e2e8f0;background:#f8fafc;">Durum</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;border-bottom:2px solid #e2e8f0;background:#f8fafc;">Öncelik</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;border-bottom:2px solid #e2e8f0;background:#f8fafc;">Atanan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${rows}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- CTA -->
+              <tr>
+                <td style="padding:36px 44px;text-align:center;">
+                  <a href="${platformUrl}" style="display:inline-block;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#ffffff;text-decoration:none;padding:16px 44px;border-radius:12px;font-size:15px;font-weight:700;letter-spacing:0.2px;box-shadow:0 4px 14px rgba(79,70,229,0.35);">
+                    Tüm Case'lere Ulaşmak İçin Tıklayın →
+                  </a>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="background:#f8fafc;padding:24px 44px;border-top:1px solid #e2e8f0;">
+                  <table width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td>
+                        <p style="color:#94a3b8;font-size:12px;margin:0;">Bu otomatik rapor Verytech Case Management tarafından gönderilmiştir.</p>
+                        <p style="color:#94a3b8;font-size:11px;margin:4px 0 0;">Her gün saat 09:00'da gönderilir.</p>
+                      </td>
+                      <td align="right">
+                        <a href="${platformUrl}" style="color:#6366f1;font-size:12px;text-decoration:none;font-weight:600;">case-management.vercel.app</a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>`;
+
+  const recipients = testEmail
+    ? [testEmail]
+    : ["destek@verytech.com.tr", "kerim.kaplan@verytech.com.tr"];
 
   await transporter.sendMail({
     from: `"Verytech Case Management" <${process.env.GMAIL_USER}>`,
-    to: ["destek@verytech.com.tr", "kerim.kaplan@verytech.com.tr"],
-    subject: `[Verytech] Günlük Vaka Raporu - ${new Date().toLocaleDateString("tr-TR")}`,
+    to: recipients,
+    subject: testEmail
+      ? `[TEST] Verytech Günlük Vaka Raporu - ${new Date().toLocaleDateString("tr-TR")}`
+      : `[Verytech] Günlük Vaka Raporu - ${new Date().toLocaleDateString("tr-TR")}`,
     html,
   });
 
-  return NextResponse.json({ message: "Report sent", count: cases.length });
+  return NextResponse.json({ message: "Report sent", count: cases.length, to: recipients });
 }
