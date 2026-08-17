@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Search, Eye, Tag, Pencil, Trash2 } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
@@ -15,6 +16,7 @@ type Article = Tables<"knowledge_base"> & {
 };
 
 export default function KnowledgeBasePage() {
+  const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -131,10 +133,10 @@ export default function KnowledgeBasePage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {articles.map((article) => (
-            <Link
+            <div
               key={article.id}
-              href={`/knowledge-base/${article.id}`}
-              className="glass rounded-2xl p-5 hover:glow-indigo transition-all group"
+              onClick={() => router.push(`/knowledge-base/${article.id}`)}
+              className="glass rounded-2xl p-5 hover:glow-indigo transition-all group cursor-pointer"
             >
               <div className="flex items-start justify-between mb-3">
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-medium">
@@ -186,7 +188,7 @@ export default function KnowledgeBasePage() {
                   </div>
                 )}
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
