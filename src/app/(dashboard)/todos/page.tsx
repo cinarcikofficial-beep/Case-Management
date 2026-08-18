@@ -146,11 +146,20 @@ export default function TodosPage() {
 
   function fromISODate(iso: string | null): string {
     if (!iso) return "";
-    return iso.slice(0, 16);
+    if (iso.includes("T")) return iso.slice(0, 16);
+    const d = new Date(iso.includes("+") || iso.includes("Z") ? iso : iso + "+00:00");
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   function toISODate(localValue: string): string {
     return localValue;
+  }
+
+  function formatReminder(iso: string | null): string {
+    if (!iso) return "";
+    const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T").replace("+00", "Z"));
+    return format(d, "d MMM HH:mm", { locale: tr });
   }
 
   function toLocalISOString(date: Date): string {
@@ -676,7 +685,7 @@ export default function TodosPage() {
                         {todo.reminder_date && (
                           <span className="text-xs text-amber-400 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
                             <Bell className="h-3 w-3" />
-                            {todo.reminder_date.replace("T", " ")}
+                            {formatReminder(todo.reminder_date)}
                           </span>
                         )}
                         {todo.repeat_type && todo.repeat_type !== "none" && (
