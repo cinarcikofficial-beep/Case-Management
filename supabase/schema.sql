@@ -149,7 +149,119 @@ CREATE TABLE comments (
 );
 
 -- =============================================
--- 11. VERIFICATION_CODES (E-posta Doğrulama Kodları)
+-- 11. TODOS (Yapılacaklar)
+-- =============================================
+CREATE TABLE todos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+  priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+  visibility TEXT NOT NULL DEFAULT 'personal' CHECK (visibility IN ('personal', 'shared')),
+  due_date TIMESTAMPTZ,
+  reminder_date TIMESTAMPTZ,
+  repeat_type TEXT NOT NULL DEFAULT 'none' CHECK (repeat_type IN ('none', 'daily', 'weekly', 'monthly', 'yearly')),
+  assigned_to UUID REFERENCES profiles(id),
+  created_by UUID REFERENCES profiles(id) NOT NULL,
+  case_id UUID REFERENCES cases(id) ON DELETE SET NULL,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_todos_status ON todos(status);
+CREATE INDEX idx_todos_assigned_to ON todos(assigned_to);
+CREATE INDEX idx_todos_created_by ON todos(created_by);
+CREATE INDEX idx_todos_due_date ON todos(due_date);
+CREATE INDEX idx_todos_created_at ON todos(created_at DESC);
+CREATE INDEX idx_todos_visibility ON todos(visibility);
+
+ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Todos: Users can view own and assigned" ON todos FOR SELECT USING (
+  (visibility = 'shared') OR
+  (auth.uid() = created_by) OR
+  (auth.uid() = assigned_to) OR
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
+);
+CREATE POLICY "Todos: Users can create" ON todos FOR INSERT WITH CHECK (auth.uid() = created_by);
+CREATE POLICY "Todos: Users can update own or assigned" ON todos FOR UPDATE USING (
+  auth.uid() = created_by OR auth.uid() = assigned_to OR
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
+);
+CREATE POLICY "Todos: Users can delete own" ON todos FOR DELETE USING (
+  auth.uid() = created_by OR
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+);
+
+CREATE TRIGGER update_todos_updated_at
+  BEFORE UPDATE ON todos
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- =============================================
+-- TODO_STEPS (Görev Alt Adımları)
+-- =============================================
+CREATE TABLE todo_steps (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  todo_id UUID REFERENCES todos(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  is_completed BOOLEAN DEFAULT false,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_todo_steps_todo_id ON todo_steps(todo_id);
+
+ALTER TABLE todo_steps ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Todo Steps: Users can view" ON todo_steps FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM todos
+    WHERE todos.id = todo_steps.todo_id
+    AND (
+      todos.visibility = 'shared' OR
+      auth.uid() = todos.created_by OR
+      auth.uid() = todos.assigned_to OR
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
+    )
+  )
+);
+CREATE POLICY "Todo Steps: Users can create" ON todo_steps FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM todos
+    WHERE todos.id = todo_steps.todo_id
+    AND (
+      auth.uid() = todos.created_by OR
+      auth.uid() = todos.assigned_to OR
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
+    )
+  )
+);
+CREATE POLICY "Todo Steps: Users can update" ON todo_steps FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM todos
+    WHERE todos.id = todo_steps.todo_id
+    AND (
+      auth.uid() = todos.created_by OR
+      auth.uid() = todos.assigned_to OR
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
+    )
+  )
+);
+CREATE POLICY "Todo Steps: Users can delete" ON todo_steps FOR DELETE USING (
+  EXISTS (
+    SELECT 1 FROM todos
+    WHERE todos.id = todo_steps.todo_id
+    AND (
+      auth.uid() = todos.created_by OR
+      auth.uid() = todos.assigned_to OR
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
+    )
+  )
+);
+
+-- =============================================
+-- 12. VERIFICATION_CODES (E-posta Doğrulama Kodları)
 -- =============================================
 CREATE TABLE verification_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

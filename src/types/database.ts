@@ -335,6 +335,85 @@ export interface Database {
           created_at?: string;
         };
       };
+      todos: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          status: "pending" | "in_progress" | "completed";
+          priority: "low" | "medium" | "high" | "urgent";
+          visibility: "personal" | "shared";
+          due_date: string | null;
+          reminder_date: string | null;
+          repeat_type: "none" | "daily" | "weekly" | "monthly" | "yearly";
+          assigned_to: string | null;
+          created_by: string;
+          case_id: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          status?: "pending" | "in_progress" | "completed";
+          priority?: "low" | "medium" | "high" | "urgent";
+          visibility?: "personal" | "shared";
+          due_date?: string | null;
+          reminder_date?: string | null;
+          repeat_type?: "none" | "daily" | "weekly" | "monthly" | "yearly";
+          assigned_to?: string | null;
+          created_by: string;
+          case_id?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          status?: "pending" | "in_progress" | "completed";
+          priority?: "low" | "medium" | "high" | "urgent";
+          visibility?: "personal" | "shared";
+          due_date?: string | null;
+          reminder_date?: string | null;
+          repeat_type?: "none" | "daily" | "weekly" | "monthly" | "yearly";
+          assigned_to?: string | null;
+          created_by?: string;
+          case_id?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      todo_steps: {
+        Row: {
+          id: string;
+          todo_id: string;
+          title: string;
+          is_completed: boolean;
+          order_index: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          todo_id: string;
+          title: string;
+          is_completed?: boolean;
+          order_index?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          todo_id?: string;
+          title?: string;
+          is_completed?: boolean;
+          order_index?: number;
+          created_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

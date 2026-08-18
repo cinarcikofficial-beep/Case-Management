@@ -8,6 +8,7 @@ import {
   Shield,
   Plus,
   LogOut,
+  CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -16,7 +17,8 @@ import Image from "next/image";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Bilgi Bankası", href: "/knowledge-base", icon: BookOpen },
+  { name: "To Do List", href: "/todos", icon: CheckSquare },
+  { name: "Knowledge Base", href: "/knowledge-base", icon: BookOpen },
 ];
 
 const adminNavigation = [

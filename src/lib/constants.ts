@@ -44,3 +44,29 @@ export const ROLES = {
   manager: { label: "Yönetici", description: "Yönetim erişimi" },
   member: { label: "Üye", description: "Standart erişim" },
 } as const;
+
+export const TODO_STATUSES = {
+  pending: { label: "Bekliyor", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30" },
+  in_progress: { label: "Devam Ediyor", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  completed: { label: "Tamamlandı", color: "bg-green-500/20 text-green-400 border-green-500/30" },
+} as const;
+
+export const TODO_PRIORITIES = {
+  low: { label: "Düşük", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30" },
+  medium: { label: "Orta", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  high: { label: "Yüksek", color: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
+  urgent: { label: "Acil", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+} as const;
+
+export const TODO_REPEAT_TYPES = {
+  none: { label: "Tekrar Yok" },
+  daily: { label: "Her Gün" },
+  weekly: { label: "Her Hafta" },
+  monthly: { label: "Her Ay" },
+  yearly: { label: "Her Yıl" },
+} as const;
+
+export const TODO_VISIBILITY = {
+  personal: { label: "Kişisel", description: "Sadece ben görebilirim" },
+  shared: { label: "Paylaşımlı", description: "Herkes görebilir" },
+} as const;
