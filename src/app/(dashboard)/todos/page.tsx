@@ -82,17 +82,34 @@ export default function TodosPage() {
   }, []);
 
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+    if ("Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission().then((p) => {
+          console.log("[Reminder] Permission granted:", p);
+        });
+      } else {
+        console.log("[Reminder] Permission already:", Notification.permission);
+      }
     }
   }, []);
 
   useEffect(() => {
     function checkReminders() {
-      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      console.log("[Reminder] Checking...", { permission: typeof Notification !== "undefined" ? Notification.permission : "N/A", todosCount: todos.length });
+
+      if (!("Notification" in window)) {
+        console.log("[Reminder] Notification API not available");
+        return;
+      }
+      if (Notification.permission !== "granted") {
+        console.log("[Reminder] Permission not granted:", Notification.permission);
+        return;
+      }
 
       const now = new Date();
       const nowStr = toLocalISOString(now);
+      console.log("[Reminder] Now:", nowStr);
+
       let changed = false;
 
       todos.forEach((todo) => {
@@ -101,10 +118,12 @@ export default function TodosPage() {
         if (notifiedRef.current.has(todo.id)) return;
 
         const reminderStr = fromISODate(todo.reminder_date);
+        console.log("[Reminder] Todo:", todo.title, "| reminder:", reminderStr, "| now:", nowStr, "| match:", reminderStr <= nowStr);
 
         if (reminderStr <= nowStr) {
           notifiedRef.current.add(todo.id);
           changed = true;
+          console.log("[Reminder] FIRING notification for:", todo.title);
           new Notification("Hatırlatma", {
             body: todo.title,
             icon: "/favicon.ico",
@@ -118,7 +137,7 @@ export default function TodosPage() {
     }
 
     checkReminders();
-    const interval = setInterval(checkReminders, 15_000);
+    const interval = setInterval(checkReminders, 10_000);
     return () => clearInterval(interval);
   }, [todos]);
 
@@ -406,6 +425,28 @@ export default function TodosPage() {
             disabled={loading}
             className="p-2.5 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white hover:border-zinc-500/60 disabled:opacity-50 transition-all"
           >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            onClick={() => {
+              if ("Notification" in window) {
+                if (Notification.permission !== "granted") {
+                  Notification.requestPermission().then((p) => {
+                    toast.success("Bildirim izni: " + p);
+                  });
+                } else {
+                  new Notification("Test Bildirimi", { body: "Bildirimler calisiyor!", icon: "/favicon.ico" });
+                  toast.success("Test bildirimi gonderildi!");
+                }
+              } else {
+                toast.error("Tarayici bildirimleri desteklenmiyor!");
+              }
+            }}
+            className="p-2.5 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-amber-400 hover:border-amber-500/60 transition-all"
+            title="Bildirim Testi"
+          >
+            <Bell className="h-4 w-4" />
+          </button>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
           <button
