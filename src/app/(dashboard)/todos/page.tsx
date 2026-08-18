@@ -70,6 +70,17 @@ export default function TodosPage() {
   });
   const supabase = createClient();
 
+  function fromISODate(iso: string | null): string {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function toISODate(localValue: string): string {
+    return new Date(localValue + ":00").toISOString();
+  }
+
   const fetchTodos = useCallback(async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -129,9 +140,9 @@ export default function TodosPage() {
         description: newTodo.description || null,
         priority: newTodo.priority,
         visibility: newTodo.visibility,
-        due_date: newTodo.due_date ? new Date(newTodo.due_date).toISOString() : null,
+        due_date: newTodo.due_date ? new Date(newTodo.due_date + "T00:00:00").toISOString() : null,
         assigned_to: newTodo.assigned_to || null,
-        reminder_date: newTodo.reminder_date ? new Date(newTodo.reminder_date).toISOString() : null,
+        reminder_date: newTodo.reminder_date ? toISODate(newTodo.reminder_date) : null,
         repeat_type: newTodo.repeat_type,
         created_by: user.id,
       };
@@ -908,8 +919,8 @@ export default function TodosPage() {
                   <label className="text-xs text-zinc-400 font-medium">Bitiş Tarihi</label>
                   <input
                     type="date"
-                    value={editingTodo.due_date ? new Date(editingTodo.due_date).toISOString().split("T")[0] : ""}
-                    onChange={(e) => setEditingTodo({ ...editingTodo, due_date: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                    value={editingTodo.due_date ? editingTodo.due_date.split("T")[0] : ""}
+                    onChange={(e) => setEditingTodo({ ...editingTodo, due_date: e.target.value ? new Date(e.target.value + "T00:00:00").toISOString() : null })}
                     className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80"
                   />
                 </div>
@@ -921,8 +932,8 @@ export default function TodosPage() {
                   </label>
                   <input
                     type="datetime-local"
-                    value={editingTodo.reminder_date ? new Date(editingTodo.reminder_date).toISOString().slice(0, 16) : ""}
-                    onChange={(e) => setEditingTodo({ ...editingTodo, reminder_date: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                    value={fromISODate(editingTodo.reminder_date)}
+                    onChange={(e) => setEditingTodo({ ...editingTodo, reminder_date: e.target.value ? toISODate(e.target.value) : null })}
                     className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:invert"
                     style={{ colorScheme: "dark" }}
                   />
