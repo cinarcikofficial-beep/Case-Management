@@ -72,6 +72,16 @@ export default function TodosPage() {
   const notifiedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem("todo_notified");
+      if (saved) {
+        const arr: string[] = JSON.parse(saved);
+        arr.forEach((id) => notifiedRef.current.add(id));
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
@@ -82,6 +92,8 @@ export default function TodosPage() {
       if (!("Notification" in window) || Notification.permission !== "granted") return;
 
       const now = new Date();
+      let changed = false;
+
       todos.forEach((todo) => {
         if (!todo.reminder_date) return;
         if (todo.status === "completed") return;
@@ -89,17 +101,24 @@ export default function TodosPage() {
 
         const reminderTime = new Date(todo.reminder_date);
         const diffMs = now.getTime() - reminderTime.getTime();
-        if (diffMs >= 0 && diffMs < 60_000) {
+
+        if (diffMs >= -10_000 && diffMs < 300_000) {
           notifiedRef.current.add(todo.id);
+          changed = true;
           new Notification("Hatırlatma", {
             body: todo.title,
             icon: "/favicon.ico",
           });
         }
       });
+
+      if (changed) {
+        localStorage.setItem("todo_notified", JSON.stringify([...notifiedRef.current]));
+      }
     }
 
-    const interval = setInterval(checkReminders, 30_000);
+    checkReminders();
+    const interval = setInterval(checkReminders, 15_000);
     return () => clearInterval(interval);
   }, [todos]);
 
