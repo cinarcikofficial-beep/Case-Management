@@ -115,7 +115,12 @@ export default function TodosPage() {
 
       let changed = false;
 
+      if (currentTodos.length === 0) {
+        console.log("[Reminder] No todos to check");
+      }
+
       currentTodos.forEach((todo) => {
+        console.log("[Reminder] Inspecting:", todo.title, "| reminder_date:", todo.reminder_date, "| status:", todo.status, "| id:", todo.id, "| notified:", notifiedRef.current.has(todo.id));
         if (!todo.reminder_date) return;
         if (todo.status === "completed") return;
         if (notifiedRef.current.has(todo.id)) return;
@@ -448,21 +453,23 @@ export default function TodosPage() {
           </button>
           <button
             onClick={() => {
-              if ("Notification" in window) {
-                if (Notification.permission !== "granted") {
-                  Notification.requestPermission().then((p) => {
-                    toast.success("Bildirim izni: " + p);
-                  });
-                } else {
-                  new Notification("Test Bildirimi", { body: "Bildirimler calisiyor!", icon: "/favicon.ico" });
-                  toast.success("Test bildirimi gonderildi!");
-                }
+              console.log("[Manual] todosRef.current:", todosRef.current);
+              console.log("[Manual] notifiedRef:", [...notifiedRef.current]);
+              const now = new Date();
+              const nowStr = toLocalISOString(now);
+              console.log("[Manual] Now:", nowStr);
+              todosRef.current.forEach((todo) => {
+                console.log("[Manual] Todo:", todo.title, "reminder:", todo.reminder_date, "status:", todo.status);
+              });
+              if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("Manuel Test", { body: "Bildirimler calisiyor!", icon: "/favicon.ico" });
+                toast.success("Manuel test bildirimi gonderildi!");
               } else {
-                toast.error("Tarayici bildirimleri desteklenmiyor!");
+                Notification.requestPermission().then(p => toast.success("Izin: " + p));
               }
             }}
             className="flex items-center gap-1.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all text-xs font-medium"
-            title="Bildirim Testi"
+            title="Manuel Test"
           >
             <Bell className="h-4 w-4" />
             Test
