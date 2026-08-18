@@ -96,58 +96,35 @@ export default function TodosPage() {
   }, []);
 
   useEffect(() => {
-    function checkReminders() {
+    const interval = setInterval(() => {
       const currentTodos = todosRef.current;
-      console.log("[Reminder] Checking...", { permission: typeof Notification !== "undefined" ? Notification.permission : "N/A", todosCount: currentTodos.length });
+      console.log("[Reminder] tick", currentTodos.length);
 
-      if (!("Notification" in window)) {
-        console.log("[Reminder] Notification API not available");
-        return;
-      }
-      if (Notification.permission !== "granted") {
-        console.log("[Reminder] Permission not granted:", Notification.permission);
-        return;
-      }
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
 
       const now = new Date();
       const nowStr = toLocalISOString(now);
-      console.log("[Reminder] Now:", nowStr);
-
       let changed = false;
 
-      if (currentTodos.length === 0) {
-        console.log("[Reminder] No todos to check");
-      }
-
       currentTodos.forEach((todo) => {
-        console.log("[Reminder] Inspecting:", todo.title, "| reminder_date:", todo.reminder_date, "| status:", todo.status, "| id:", todo.id, "| notified:", notifiedRef.current.has(todo.id));
-        if (!todo.reminder_date) return;
-        if (todo.status === "completed") return;
-        if (notifiedRef.current.has(todo.id)) return;
+        if (!todo.reminder_date || todo.status === "completed" || notifiedRef.current.has(todo.id)) return;
 
         const reminderStr = fromISODate(todo.reminder_date);
-        console.log("[Reminder] Todo:", todo.title, "| reminder:", reminderStr, "| now:", nowStr, "| match:", reminderStr <= nowStr);
+        console.log("[Reminder]", todo.title, reminderStr, "<=", nowStr, "?", reminderStr <= nowStr);
 
         if (reminderStr <= nowStr) {
           notifiedRef.current.add(todo.id);
           changed = true;
-          console.log("[Reminder] FIRING notification for:", todo.title);
-          new Notification("Hatırlatma", {
-            body: todo.title,
-            icon: "/favicon.ico",
-          });
+          console.log("[Reminder] FIRE:", todo.title);
+          new Notification("Hatırlatma", { body: todo.title, icon: "/favicon.ico" });
         }
       });
 
-      if (changed) {
-        localStorage.setItem("todo_notified", JSON.stringify([...notifiedRef.current]));
-      }
-    }
+      if (changed) localStorage.setItem("todo_notified", JSON.stringify([...notifiedRef.current]));
+    }, 10_000);
 
-    checkReminders();
-    const interval = setInterval(checkReminders, 10_000);
     return () => clearInterval(interval);
-  }, [todos]);
+  }, []);
 
   function fromISODate(iso: string | null): string {
     if (!iso) return "";
