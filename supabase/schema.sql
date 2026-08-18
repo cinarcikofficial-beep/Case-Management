@@ -186,6 +186,7 @@ CREATE POLICY "Todos: Users can view own and assigned" ON todos FOR SELECT USING
 );
 CREATE POLICY "Todos: Users can create" ON todos FOR INSERT WITH CHECK (auth.uid() = created_by);
 CREATE POLICY "Todos: Users can update own or assigned" ON todos FOR UPDATE USING (
+  (visibility = 'shared') OR
   auth.uid() = created_by OR auth.uid() = assigned_to OR
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
 );
@@ -231,6 +232,7 @@ CREATE POLICY "Todo Steps: Users can create" ON todo_steps FOR INSERT WITH CHECK
     SELECT 1 FROM todos
     WHERE todos.id = todo_steps.todo_id
     AND (
+      todos.visibility = 'shared' OR
       auth.uid() = todos.created_by OR
       auth.uid() = todos.assigned_to OR
       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
@@ -242,6 +244,7 @@ CREATE POLICY "Todo Steps: Users can update" ON todo_steps FOR UPDATE USING (
     SELECT 1 FROM todos
     WHERE todos.id = todo_steps.todo_id
     AND (
+      todos.visibility = 'shared' OR
       auth.uid() = todos.created_by OR
       auth.uid() = todos.assigned_to OR
       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
@@ -253,6 +256,7 @@ CREATE POLICY "Todo Steps: Users can delete" ON todo_steps FOR DELETE USING (
     SELECT 1 FROM todos
     WHERE todos.id = todo_steps.todo_id
     AND (
+      todos.visibility = 'shared' OR
       auth.uid() = todos.created_by OR
       auth.uid() = todos.assigned_to OR
       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))
