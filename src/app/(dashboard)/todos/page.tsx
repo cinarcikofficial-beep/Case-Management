@@ -92,6 +92,7 @@ export default function TodosPage() {
       if (!("Notification" in window) || Notification.permission !== "granted") return;
 
       const now = new Date();
+      const nowStr = toLocalISOString(now);
       let changed = false;
 
       todos.forEach((todo) => {
@@ -99,10 +100,9 @@ export default function TodosPage() {
         if (todo.status === "completed") return;
         if (notifiedRef.current.has(todo.id)) return;
 
-        const reminderTime = new Date(todo.reminder_date);
-        const diffMs = now.getTime() - reminderTime.getTime();
+        const reminderStr = fromISODate(todo.reminder_date);
 
-        if (diffMs >= -10_000 && diffMs < 300_000) {
+        if (reminderStr <= nowStr) {
           notifiedRef.current.add(todo.id);
           changed = true;
           new Notification("Hatırlatma", {
@@ -124,13 +124,16 @@ export default function TodosPage() {
 
   function fromISODate(iso: string | null): string {
     if (!iso) return "";
-    const d = new Date(iso);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return iso.replace("Z", "").split("+")[0].slice(0, 16);
   }
 
   function toISODate(localValue: string): string {
-    return new Date(localValue + ":00").toISOString();
+    return localValue + ":00";
+  }
+
+  function toLocalISOString(date: Date): string {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
   const fetchTodos = useCallback(async () => {
