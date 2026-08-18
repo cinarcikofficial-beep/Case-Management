@@ -70,6 +70,8 @@ export default function TodosPage() {
   });
   const supabase = createClient();
   const notifiedRef = useRef<Set<string>>(new Set());
+  const todosRef = useRef(todos);
+  todosRef.current = todos;
 
   useEffect(() => {
     try {
@@ -95,7 +97,8 @@ export default function TodosPage() {
 
   useEffect(() => {
     function checkReminders() {
-      console.log("[Reminder] Checking...", { permission: typeof Notification !== "undefined" ? Notification.permission : "N/A", todosCount: todos.length });
+      const currentTodos = todosRef.current;
+      console.log("[Reminder] Checking...", { permission: typeof Notification !== "undefined" ? Notification.permission : "N/A", todosCount: currentTodos.length });
 
       if (!("Notification" in window)) {
         console.log("[Reminder] Notification API not available");
@@ -112,7 +115,7 @@ export default function TodosPage() {
 
       let changed = false;
 
-      todos.forEach((todo) => {
+      currentTodos.forEach((todo) => {
         if (!todo.reminder_date) return;
         if (todo.status === "completed") return;
         if (notifiedRef.current.has(todo.id)) return;
