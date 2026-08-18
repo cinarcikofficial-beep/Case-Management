@@ -449,10 +449,11 @@ export default function TodosPage() {
                 toast.error("Tarayici bildirimleri desteklenmiyor!");
               }
             }}
-            className="p-2.5 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-amber-400 hover:border-amber-500/60 transition-all"
+            className="flex items-center gap-1.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all text-xs font-medium"
             title="Bildirim Testi"
           >
             <Bell className="h-4 w-4" />
+            Test
           </button>
           <button
             onClick={() => setShowAddModal(true)}
