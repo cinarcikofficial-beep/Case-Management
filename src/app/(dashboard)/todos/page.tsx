@@ -790,7 +790,8 @@ export default function TodosPage() {
                     type="datetime-local"
                     value={newTodo.reminder_date}
                     onChange={(e) => setNewTodo({ ...newTodo, reminder_date: e.target.value })}
-                    className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80"
+                    className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:invert"
+                    style={{ colorScheme: "dark" }}
                   />
                 </div>
                 <div>
@@ -922,7 +923,8 @@ export default function TodosPage() {
                     type="datetime-local"
                     value={editingTodo.reminder_date ? new Date(editingTodo.reminder_date).toISOString().slice(0, 16) : ""}
                     onChange={(e) => setEditingTodo({ ...editingTodo, reminder_date: e.target.value ? new Date(e.target.value).toISOString() : null })}
-                    className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80"
+                    className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[#0b111e]/60 border border-[#233554]/80 text-white text-sm focus:outline-none focus:border-indigo-500/80 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:invert"
+                    style={{ colorScheme: "dark" }}
                   />
                 </div>
                 <div>
