@@ -411,7 +411,7 @@ export default function TodosPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="glass rounded-2xl p-4 hover:glow-indigo transition-all cursor-default">
+        <button onClick={() => setStatusFilter(statusFilter === "pending" ? "" : "pending")} className={`glass rounded-2xl p-4 transition-all cursor-pointer text-left ${statusFilter === "pending" ? "ring-2 ring-zinc-400/50 bg-zinc-500/10" : "hover:glow-indigo"}`}>
           <div className="flex items-center gap-3">
             <div className="bg-zinc-500/10 p-2 rounded-xl">
               <AlertCircle className="h-5 w-5 text-zinc-400" />
@@ -421,8 +421,8 @@ export default function TodosPage() {
               <p className="text-xl font-bold text-zinc-100">{todos.filter(t => t.status === "pending").length}</p>
             </div>
           </div>
-        </div>
-        <div className="glass rounded-2xl p-4 hover:glow-indigo transition-all cursor-default">
+        </button>
+        <button onClick={() => setStatusFilter(statusFilter === "in_progress" ? "" : "in_progress")} className={`glass rounded-2xl p-4 transition-all cursor-pointer text-left ${statusFilter === "in_progress" ? "ring-2 ring-blue-400/50 bg-blue-500/10" : "hover:glow-indigo"}`}>
           <div className="flex items-center gap-3">
             <div className="bg-blue-500/10 p-2 rounded-xl">
               <Clock className="h-5 w-5 text-blue-400" />
@@ -432,8 +432,8 @@ export default function TodosPage() {
               <p className="text-xl font-bold text-zinc-100">{todos.filter(t => t.status === "in_progress").length}</p>
             </div>
           </div>
-        </div>
-        <div className="glass rounded-2xl p-4 hover:glow-indigo transition-all cursor-default">
+        </button>
+        <button onClick={() => setStatusFilter(statusFilter === "completed" ? "" : "completed")} className={`glass rounded-2xl p-4 transition-all cursor-pointer text-left ${statusFilter === "completed" ? "ring-2 ring-green-400/50 bg-green-500/10" : "hover:glow-indigo"}`}>
           <div className="flex items-center gap-3">
             <div className="bg-green-500/10 p-2 rounded-xl">
               <CheckCircle2 className="h-5 w-5 text-green-400" />
@@ -443,8 +443,8 @@ export default function TodosPage() {
               <p className="text-xl font-bold text-zinc-100">{todos.filter(t => t.status === "completed").length}</p>
             </div>
           </div>
-        </div>
-        <div className="glass rounded-2xl p-4 hover:glow-indigo transition-all cursor-default">
+        </button>
+        <button onClick={() => { setStatusFilter(""); setPriorityFilter(""); setVisibilityFilter(""); setSearch(""); }} className="glass rounded-2xl p-4 transition-all cursor-pointer text-left hover:glow-indigo">
           <div className="flex items-center gap-3">
             <div className="bg-red-500/10 p-2 rounded-xl">
               <Calendar className="h-5 w-5 text-red-400" />
@@ -456,7 +456,7 @@ export default function TodosPage() {
               </p>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Todo List */}
