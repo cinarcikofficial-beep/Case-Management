@@ -428,6 +428,13 @@ export default function TodosPage() {
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
           <button
+            onClick={() => fetchTodos()}
+            disabled={loading}
+            className="p-2.5 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white hover:border-zinc-500/60 disabled:opacity-50 transition-all"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <button
             onClick={() => {
               if ("Notification" in window) {
                 if (Notification.permission !== "granted") {
@@ -446,8 +453,6 @@ export default function TodosPage() {
             title="Bildirim Testi"
           >
             <Bell className="h-4 w-4" />
-          </button>
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={() => setShowAddModal(true)}
