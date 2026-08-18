@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Plus,
@@ -69,6 +69,39 @@ export default function TodosPage() {
     repeat_type: "none" as const,
   });
   const supabase = createClient();
+  const notifiedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  useEffect(() => {
+    function checkReminders() {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+      const now = new Date();
+      todos.forEach((todo) => {
+        if (!todo.reminder_date) return;
+        if (todo.status === "completed") return;
+        if (notifiedRef.current.has(todo.id)) return;
+
+        const reminderTime = new Date(todo.reminder_date);
+        const diffMs = now.getTime() - reminderTime.getTime();
+        if (diffMs >= 0 && diffMs < 60_000) {
+          notifiedRef.current.add(todo.id);
+          new Notification("Hatırlatma", {
+            body: todo.title,
+            icon: "/favicon.ico",
+          });
+        }
+      });
+    }
+
+    const interval = setInterval(checkReminders, 30_000);
+    return () => clearInterval(interval);
+  }, [todos]);
 
   function fromISODate(iso: string | null): string {
     if (!iso) return "";
