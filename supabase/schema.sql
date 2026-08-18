@@ -159,7 +159,7 @@ CREATE TABLE todos (
   priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
   visibility TEXT NOT NULL DEFAULT 'personal' CHECK (visibility IN ('personal', 'shared')),
   due_date TIMESTAMPTZ,
-  reminder_date TIMESTAMPTZ,
+  reminder_date TEXT,
   repeat_type TEXT NOT NULL DEFAULT 'none' CHECK (repeat_type IN ('none', 'daily', 'weekly', 'monthly', 'yearly')),
   assigned_to UUID REFERENCES profiles(id),
   created_by UUID REFERENCES profiles(id) NOT NULL,

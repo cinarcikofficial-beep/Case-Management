@@ -143,11 +143,11 @@ export default function TodosPage() {
 
   function fromISODate(iso: string | null): string {
     if (!iso) return "";
-    return iso.replace("Z", "").split("+")[0].slice(0, 16);
+    return iso.slice(0, 16);
   }
 
   function toISODate(localValue: string): string {
-    return localValue + ":00";
+    return localValue;
   }
 
   function toLocalISOString(date: Date): string {
@@ -673,7 +673,7 @@ export default function TodosPage() {
                         {todo.reminder_date && (
                           <span className="text-xs text-amber-400 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
                             <Bell className="h-3 w-3" />
-                            {format(new Date(todo.reminder_date), "d MMM HH:mm", { locale: tr })}
+                            {todo.reminder_date.replace("T", " ")}
                           </span>
                         )}
                         {todo.repeat_type && todo.repeat_type !== "none" && (
