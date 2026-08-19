@@ -58,6 +58,10 @@ export default function TodosPage() {
   const [addingStepTo, setAddingStepTo] = useState<string | null>(null);
   const [stepSaving, setStepSaving] = useState(false);
   const [deleteStepTarget, setDeleteStepTarget] = useState<{ id: string; todoId: string } | null>(null);
+  const [activeReminders, setActiveReminders] = useState<{ id: string; title: string; date: string }[]>([]);
+  const [remindMenuId, setRemindMenuId] = useState<string | null>(null);
+  const [customRemindId, setCustomRemindId] = useState<string | null>(null);
+  const [customRemindDate, setCustomRemindDate] = useState("");
   const [newTodo, setNewTodo] = useState({
     title: "",
     description: "",
@@ -72,6 +76,7 @@ export default function TodosPage() {
   const notifiedRef = useRef<Set<string>>(new Set());
   const todosRef = useRef(todos);
   todosRef.current = todos;
+  const firedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     try {
@@ -84,69 +89,89 @@ export default function TodosPage() {
   }, []);
 
   useEffect(() => {
-    if ("Notification" in window) {
-      if (Notification.permission === "default") {
-        Notification.requestPermission().then((p) => {
-          console.log("[Reminder] Permission granted:", p);
-        });
-      } else {
-        console.log("[Reminder] Permission already:", Notification.permission);
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-remind-menu]")) {
+        setRemindMenuId(null);
+        setCustomRemindId(null);
       }
     }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const currentTodos = todosRef.current;
-      console.log("[Reminder] tick", currentTodos.length);
-
-      if (!("Notification" in window) || Notification.permission !== "granted") return;
-
       const now = new Date();
-      const nowStr = toLocalISOString(now);
       let changed = false;
 
       currentTodos.forEach((todo) => {
-        if (!todo.reminder_date || todo.status === "completed" || notifiedRef.current.has(todo.id)) return;
+        if (!todo.reminder_date || todo.status === "completed") return;
 
-        const reminderStr = fromISODate(todo.reminder_date);
-        console.log("[Reminder]", todo.title, reminderStr, "<=", nowStr, "?", reminderStr <= nowStr);
+        const reminderDate = new Date(todo.reminder_date);
+        if (isNaN(reminderDate.getTime())) return;
 
-        if (reminderStr <= nowStr) {
+        const isPast = reminderDate.getTime() <= now.getTime();
+        const alreadyFired = firedIdsRef.current.has(todo.id);
+
+        if (isPast && !alreadyFired) {
+          firedIdsRef.current.add(todo.id);
           notifiedRef.current.add(todo.id);
           changed = true;
-          console.log("[Reminder] FIRE:", todo.title);
-          new Notification("Hatırlatma", { body: todo.title, icon: "/favicon.ico" });
+
+          setActiveReminders((prev) => {
+            if (prev.some((r) => r.id === todo.id)) return prev;
+            return [...prev, { id: todo.id, title: todo.title, date: format(reminderDate, "d MMM HH:mm", { locale: tr }) }];
+          });
+
+          if ("Notification" in window && Notification.permission === "granted") {
+            try {
+              new Notification("Hatırlatma", { body: todo.title, icon: "/favicon.ico" });
+            } catch {}
+          }
         }
       });
 
-      if (changed) localStorage.setItem("todo_notified", JSON.stringify([...notifiedRef.current]));
-    }, 10_000);
+      if (changed) {
+        localStorage.setItem("todo_notified", JSON.stringify([...notifiedRef.current]));
+      }
+    }, 5_000);
 
     return () => clearInterval(interval);
   }, []);
 
   function fromISODate(iso: string | null): string {
     if (!iso) return "";
-    if (iso.includes("T")) return iso.slice(0, 16);
-    const d = new Date(iso.includes("+") || iso.includes("Z") ? iso : iso + "+00:00");
+    const d = new Date(iso.includes("+") || iso.includes("Z") || iso.includes("T") ? iso : iso + "+00:00");
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   function toISODate(localValue: string): string {
-    return localValue;
+    if (!localValue) return "";
+    const [datePart, timePart] = localValue.split("T");
+    if (!datePart || !timePart) return localValue;
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hours, minutes] = timePart.split(":").map(Number);
+    const d = new Date(year, month - 1, day, hours, minutes);
+    const offset = -d.getTimezoneOffset();
+    const sign = offset >= 0 ? "+" : "-";
+    const offH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+    const offM = String(Math.abs(offset) % 60).padStart(2, "0");
+    return `${datePart}T${timePart}:00${sign}${offH}:${offM}`;
   }
 
   function formatReminder(iso: string | null): string {
     if (!iso) return "";
-    const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T").replace("+00", "Z"));
+    const d = new Date(iso);
     return format(d, "d MMM HH:mm", { locale: tr });
-  }
-
-  function toLocalISOString(date: Date): string {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
   const fetchTodos = useCallback(async () => {
@@ -167,9 +192,6 @@ export default function TodosPage() {
         `
       );
 
-    if (statusFilter) query = query.eq("status", statusFilter);
-    if (priorityFilter) query = query.eq("priority", priorityFilter);
-    if (visibilityFilter) query = query.eq("visibility", visibilityFilter);
     if (search) query = query.ilike("title", `%${search}%`);
 
     query = query.order("created_at", { ascending: false });
@@ -184,7 +206,7 @@ export default function TodosPage() {
       setTodos(todosWithSteps);
     }
     setLoading(false);
-  }, [supabase, statusFilter, priorityFilter, visibilityFilter, search]);
+  }, [supabase, search]);
 
   useEffect(() => { fetchTodos(); }, [fetchTodos]);
 
@@ -235,6 +257,17 @@ export default function TodosPage() {
 
     setSaving(true);
     try {
+      const reminderIso = editingTodo.reminder_date
+        ? toISODate(fromISODate(editingTodo.reminder_date))
+        : null;
+
+      const prevTodo = todos.find((t) => t.id === editingTodo.id);
+      if (prevTodo && prevTodo.reminder_date !== reminderIso) {
+        firedIdsRef.current.delete(editingTodo.id);
+        notifiedRef.current.delete(editingTodo.id);
+        localStorage.setItem("todo_notified", JSON.stringify([...notifiedRef.current]));
+      }
+
       const { error } = await supabase
         .from("todos")
         .update({
@@ -244,7 +277,7 @@ export default function TodosPage() {
           visibility: editingTodo.visibility,
           due_date: editingTodo.due_date,
           assigned_to: editingTodo.assigned_to,
-          reminder_date: editingTodo.reminder_date,
+          reminder_date: reminderIso,
           repeat_type: editingTodo.repeat_type,
         })
         .eq("id", editingTodo.id);
@@ -285,7 +318,12 @@ export default function TodosPage() {
     } else {
       const labels = { pending: "Bekliyor", in_progress: "Devam Ediyor", completed: "Tamamlandı" };
       toast.success(`Durum "${labels[newStatus]}" olarak güncellendi.`);
-      fetchTodos();
+
+      if (newStatus === "completed" && todo.repeat_type && todo.repeat_type !== "none") {
+        await createNextOccurrence(todo);
+      } else {
+        fetchTodos();
+      }
     }
     setTogglingId(null);
   }
@@ -397,7 +435,90 @@ export default function TodosPage() {
     }
   }
 
-  const filteredTodos = todos;
+  function addRepeatInterval(date: Date, repeatType: string): Date {
+    const next = new Date(date);
+    switch (repeatType) {
+      case "daily": next.setDate(next.getDate() + 1); break;
+      case "weekly": next.setDate(next.getDate() + 7); break;
+      case "monthly": next.setMonth(next.getMonth() + 1); break;
+      case "yearly": next.setFullYear(next.getFullYear() + 1); break;
+    }
+    return next;
+  }
+
+  async function createNextOccurrence(todo: Todo) {
+    if (!todo.repeat_type || todo.repeat_type === "none") return;
+
+    const nextDueDate = todo.due_date ? addRepeatInterval(new Date(todo.due_date), todo.repeat_type).toISOString() : null;
+    const nextReminderDate = todo.reminder_date ? addRepeatInterval(new Date(todo.reminder_date), todo.repeat_type).toISOString() : null;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from("todos").insert({
+      title: todo.title,
+      description: todo.description,
+      priority: todo.priority,
+      visibility: todo.visibility,
+      due_date: nextDueDate,
+      reminder_date: nextReminderDate,
+      repeat_type: todo.repeat_type,
+      assigned_to: todo.assigned_to,
+      created_by: user.id,
+      status: "pending",
+    });
+
+    if (!error) {
+      toast.success(`Bir sonraki "${todo.title}" görevi otomatik oluşturuldu.`);
+      fetchTodos();
+    }
+  }
+
+  function toDateTimeLocal(date: Date): string {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  async function handleRemindAfter(todoId: string, minutes: number) {
+    const newDate = new Date(Date.now() + minutes * 60 * 1000);
+    const iso = toISODate(toDateTimeLocal(newDate));
+
+    await supabase.from("todos").update({ reminder_date: iso }).eq("id", todoId);
+
+    firedIdsRef.current.delete(todoId);
+    notifiedRef.current.delete(todoId);
+    localStorage.setItem("todo_notified", JSON.stringify([...notifiedRef.current]));
+
+    setActiveReminders((prev) => prev.filter((r) => r.id !== todoId));
+    setRemindMenuId(null);
+    fetchTodos();
+    toast.success(`Hatırlatma ${minutes < 60 ? minutes + " dakika" : minutes === 60 ? "1 saat" : "1 gün"} sonra tekrar gelecek.`);
+  }
+
+  async function handleRemindCustom(todoId: string) {
+    if (!customRemindDate) return;
+    const iso = toISODate(customRemindDate);
+
+    await supabase.from("todos").update({ reminder_date: iso }).eq("id", todoId);
+
+    firedIdsRef.current.delete(todoId);
+    notifiedRef.current.delete(todoId);
+    localStorage.setItem("todo_notified", JSON.stringify([...notifiedRef.current]));
+
+    setActiveReminders((prev) => prev.filter((r) => r.id !== todoId));
+    setRemindMenuId(null);
+    setCustomRemindId(null);
+    setCustomRemindDate("");
+    fetchTodos();
+    toast.success("Hatırlatma belirlenen zamana alındı.");
+  }
+
+  const filteredTodos = todos.filter((todo) => {
+    if (statusFilter && todo.status !== statusFilter) return false;
+    if (priorityFilter && todo.priority !== priorityFilter) return false;
+    if (visibilityFilter && todo.visibility !== visibilityFilter) return false;
+    return true;
+  });
 
   function getStepProgress(todo: Todo) {
     const steps = todo.todo_steps || [];
@@ -408,6 +529,95 @@ export default function TodosPage() {
 
   return (
     <div className="space-y-6">
+      {activeReminders.length > 0 && (
+        <div className="space-y-2">
+          {activeReminders.map((reminder) => (
+            <div
+              key={reminder.id}
+              className="flex items-center justify-between px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300"
+            >
+              <div className="flex items-center gap-3">
+                <Bell className="h-5 w-5 text-amber-400 flex-shrink-0" />
+                <div>
+                  <span className="font-medium">{reminder.title}</span>
+                  <span className="text-amber-400/70 text-sm ml-2">· {reminder.date}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5" data-remind-menu>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setRemindMenuId(remindMenuId === reminder.id ? null : reminder.id);
+                      setCustomRemindId(null);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-medium transition-all"
+                  >
+                    Tekrar Hatırlat
+                  </button>
+                  {remindMenuId === reminder.id && !customRemindId && (
+                    <div className="absolute right-0 top-full mt-1 w-44 bg-[#0f172a] border border-[#233554]/80 rounded-xl shadow-2xl z-50 overflow-hidden">
+                      <button onClick={() => handleRemindAfter(reminder.id, 10)} className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-[#162238] hover:text-white transition-all">
+                        10 Dakika Sonra
+                      </button>
+                      <button onClick={() => handleRemindAfter(reminder.id, 30)} className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-[#162238] hover:text-white transition-all">
+                        30 Dakika Sonra
+                      </button>
+                      <button onClick={() => handleRemindAfter(reminder.id, 60)} className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-[#162238] hover:text-white transition-all">
+                        1 Saat Sonra
+                      </button>
+                      <button onClick={() => handleRemindAfter(reminder.id, 1440)} className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-[#162238] hover:text-white transition-all">
+                        1 Gün Sonra
+                      </button>
+                      <div className="border-t border-[#233554]/60" />
+                      <button onClick={() => setCustomRemindId(reminder.id)} className="w-full text-left px-3 py-2 text-xs text-indigo-400 hover:bg-[#162238] hover:text-indigo-300 transition-all">
+                        Sen Belirle...
+                      </button>
+                    </div>
+                  )}
+                  {customRemindId === reminder.id && (
+                    <div className="absolute right-0 top-full mt-1 w-60 bg-[#0f172a] border border-[#233554]/80 rounded-xl shadow-2xl z-50 p-3">
+                      <p className="text-xs text-zinc-400 mb-2">Tarih ve saat seçin:</p>
+                      <input
+                        type="datetime-local"
+                        value={customRemindDate}
+                        onChange={(e) => setCustomRemindDate(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#0b111e]/60 border border-[#233554]/80 text-white text-xs focus:outline-none focus:border-indigo-500/80 mb-2 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:invert"
+                        style={{ colorScheme: "dark" }}
+                      />
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => { setCustomRemindId(null); setCustomRemindDate(""); }}
+                          className="flex-1 px-2 py-1.5 rounded-lg bg-[#1e2e4a] text-zinc-400 text-xs hover:text-white transition-all"
+                        >
+                          İptal
+                        </button>
+                        <button
+                          onClick={() => handleRemindCustom(reminder.id)}
+                          disabled={!customRemindDate}
+                          className="flex-1 px-2 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-500 disabled:opacity-40 transition-all"
+                        >
+                          Onayla
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    notifiedRef.current.add(reminder.id);
+                    localStorage.setItem("todo_notified", JSON.stringify([...notifiedRef.current]));
+                    setActiveReminders((prev) => prev.filter((r) => r.id !== reminder.id));
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-zinc-500/20 hover:bg-zinc-500/30 text-zinc-400 text-xs font-medium transition-all"
+                >
+                  Kapat
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-100">To Do List</h1>
@@ -420,36 +630,6 @@ export default function TodosPage() {
             className="p-2.5 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white hover:border-zinc-500/60 disabled:opacity-50 transition-all"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={() => fetchTodos()}
-            disabled={loading}
-            className="p-2.5 rounded-xl bg-[#162238]/60 border border-[#233554]/60 text-zinc-400 hover:text-white hover:border-zinc-500/60 disabled:opacity-50 transition-all"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={() => {
-              console.log("[Manual] todosRef.current:", todosRef.current);
-              console.log("[Manual] notifiedRef:", [...notifiedRef.current]);
-              const now = new Date();
-              const nowStr = toLocalISOString(now);
-              console.log("[Manual] Now:", nowStr);
-              todosRef.current.forEach((todo) => {
-                console.log("[Manual] Todo:", todo.title, "reminder:", todo.reminder_date, "status:", todo.status);
-              });
-              if ("Notification" in window && Notification.permission === "granted") {
-                new Notification("Manuel Test", { body: "Bildirimler calisiyor!", icon: "/favicon.ico" });
-                toast.success("Manuel test bildirimi gonderildi!");
-              } else {
-                Notification.requestPermission().then(p => toast.success("Izin: " + p));
-              }
-            }}
-            className="flex items-center gap-1.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all text-xs font-medium"
-            title="Manuel Test"
-          >
-            <Bell className="h-4 w-4" />
-            Test
           </button>
           <button
             onClick={() => setShowAddModal(true)}
