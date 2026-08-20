@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
+import { formatDistanceToNow } from "date-fns";
+import { tr } from "date-fns/locale";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,7 +35,7 @@ export async function GET(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!cases || cases.length === 0) return NextResponse.json({ message: "No open cases" });
 
-  const platformUrl = "https://case-management-zeta.vercel.app";
+  const platformUrl = "https://case-management-5tpauqhrf-qr-menu-project1.vercel.app";
   const today = new Date().toLocaleDateString("tr-TR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   // Dashboard ile birebir aynı renkler
@@ -62,6 +64,7 @@ export async function GET(request: Request) {
       <td style="padding:10px 14px;border-bottom:1px solid #233554;"><span style="background:${sc.bg};color:${sc.text};padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid ${sc.border};display:inline-block;">● ${statusLabel[c.status] || c.status}</span></td>
       <td style="padding:10px 14px;border-bottom:1px solid #233554;"><span style="background:${pc.bg};color:${pc.text};padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid ${pc.border};display:inline-block;">${priorityLabel[c.priority] || c.priority}</span></td>
       <td style="padding:10px 14px;border-bottom:1px solid #233554;font-size:13px;color:${profile ? "#e2e8f0" : "#475569"};">${profile?.full_name || "Atanmamış"}</td>
+      <td style="padding:10px 14px;border-bottom:1px solid #233554;font-size:13px;color:#818cf8;font-weight:600;">${formatDistanceToNow(new Date(c.created_at), { addSuffix: false, locale: tr })}</td>
     </tr>`;
   }).join("");
 
@@ -105,6 +108,7 @@ export async function GET(request: Request) {
             <th style="padding:10px 14px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;border-bottom:1px solid #233554;">Durum</th>
             <th style="padding:10px 14px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;border-bottom:1px solid #233554;">Öncelik</th>
             <th style="padding:10px 14px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;border-bottom:1px solid #233554;">Atanan</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;border-bottom:1px solid #233554;">Geçen Süre</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
