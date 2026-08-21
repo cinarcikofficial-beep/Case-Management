@@ -131,7 +131,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-[400px] bg-[#1e293b] border border-[#334155] rounded-2xl p-10 shadow-[0_10px_25px_rgba(0,0,0,0.3)] text-center">
         <div className="flex justify-center mb-6">
           <Image src="/verytech_beyaz.png" alt="Verytech" width={200} height={200} className="object-contain" />
@@ -339,6 +339,7 @@ export default function LoginPage() {
           </form>
         )}
       </div>
+      <p className="mt-6 text-xs text-slate-500">&copy;2026 - Designed By Kerim KAPLAN</p>
     </div>
   );
 }
